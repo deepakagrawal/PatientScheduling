@@ -1,18 +1,22 @@
 from __future__ import division
-from pyutilib.misc import Options
-import multiprocessing as mp
-import sys,getopt
-import sys
-import pandas as pd
-from model_code1 import generateDailyProb
-import numpy as np
+
+import getopt
 import itertools
-import tempfile
-from scipy import stats
-import functools
-from gams import *
+import multiprocessing as mp
+import sys
+import sys
+
 import argparse
+import functools
 import json
+import numpy as np
+import pandas as pd
+import tempfile
+from gams import *
+from pyutilib.misc import Options
+from scipy import stats
+
+from model_code1 import generateDailyProb
 
 
 def allocateUrgent(pat,P,patgoing,cancel,left,cr):
@@ -152,7 +156,8 @@ def run_main(iter, data=None):
         else:
             P = data.Prob
         data.dat_C = data.dat_C.append({'Run':iter, 'Horizon':data.dd, 'Theta':data.tehta, 'Choice':data.ch, 'Policy':data.dynamic,
-                      'Loc_Dep':loc_dep, 'Joint':joint[0], 'Doubly':dob, 'day':i, 'C11':data.C[0,0], 'C12':data.C[0,1],
+                                        'Loc_Dep': loc_dep, 'Joint': args.joint[0], 'Doubly': dob, 'day': i,
+                                        'C11': data.C[0, 0], 'C12': data.C[0, 1],
                       'C21':data.C[1,0], 'C22':data.C[1,1], 'C31':data.C[2,0], 'C32':data.C[2,1], 'C41':data.C[3,0],
                       'C42':data.C[3,1], 'C51':data.C[4,0], 'C52':data.C[4,1]}, ignore_index=True)
         patgoing = np.zeros([data.dd, data.dk, data.dt,data.dc,data.dl])
@@ -317,13 +322,10 @@ if __name__ == "__main__":
     data.tmpdir = tempfile.mkdtemp(dir = "/storage/work/dua143/PatSchedPang_v2/FairScheduling/gams_try")
     with open(data.tmpdir+"/params.txt","w") as params_file:
         json.dumps(vars(args), params_file)
-    if len(sys.argv) != 1:
-        params_file =
-        params_file.write("".join(map(str,myopts)))
-        params_file.close()
     result_file = tempfile.NamedTemporaryFile(suffix='.csv',
-                                              prefix='_'.join(policy)+'testPaperSingleOpt_detLam_result_gen_loc_all_constant_Oct7_hammer',
-                                              dir=data.tmpdir,delete=False)
+                                              prefix='_'.join(
+                                                  args.policy) + 'testPaperSingleOpt_detLam_result_gen_loc_all_constant_Oct7_hammer',
+                                              dir=data.tmpdir, delete=False)
     C_file = tempfile.NamedTemporaryFile(suffix='.csv',
                                               prefix='C_table'+'testPaperSingleOpt_detLam_result_gen_loc_all_constant_Oct7_hammer',
                                               dir=data.tmpdir,delete=False)
@@ -336,16 +338,16 @@ if __name__ == "__main__":
         outfile.write('%s' % ','.join(map(str, ['Run','Horizon','Theta','Choice','Policy','Loc_Dep','Joint','Doubly','Profit'])))
         outfile.write('\n')
 
-        for dob in doubly:
+        for dob in args.doubly:
             l_original = calc_lambda(data,dob)
-            for data.joint in joint:
-                for ch in range(dchoice_a,dchoice_b):
+            for data.joint in args.joint:
+                for ch in args.choices:
                     for data.dd in args.horizon:
                         data.v = calculate_choice(data.dd, data.dk, data.dt,data.dc, data.dl,ch,[varray1, varray2])
                         data.r = np.array([max(1 - 0.04 * j, 0.6) for j in range(data.dd)])
-                        for data.theta in theta:
-                            for data.dynamic in policy:
-                                for loc_dep in range(loc_a,loc_b):
+                        for data.theta in args.theta:
+                            for data.dynamic in args.policy:
+                                for loc_dep in args.locations:
                                     data.Prob = np.zeros([data.dd, data.dk, data.dt, data.dc, data.dl])
                                     results = None
                                     data.l[1,:,:] = l_original.copy()
@@ -357,16 +359,16 @@ if __name__ == "__main__":
                                         if (data.Prob < 0).any() or (data.Prob > 1).any():
                                             pd.DataFrame(np.array([data.theta, data.dd, ch, data.dynamic])).to_csv("error.csv")
                                         pool = mp.Pool(processes=data.processes)
-                                        results = pool.map(functools.partial(run_main, data=data), range(Imax))
-                                        # for ii in range(Imax):
+                                        results = pool.map(functools.partial(run_main, data=data), range(args.Imax))
+                                        # for ii in range(args.Imax):
                                         #    print run_main(ii, data=data)
                                     elif data.dynamic == "DCPP":
                                         data.Prob = generateDailyProb(data, "CP", loc_dep=loc_dep)
                                         if (data.Prob < 0).any() or (data.Prob > 1).any():
                                             pd.DataFrame(np.array([data.theta, data.dd, ch, data.dynamic])).to_csv("error.csv")
                                         pool = mp.Pool(processes=data.processes)
-                                        results = pool.map(functools.partial(run_main, data=data), range(Imax))
-                                        # for ii in range(Imax):
+                                        results = pool.map(functools.partial(run_main, data=data), range(args.Imax))
+                                        # for ii in range(args.Imax):
                                         #    run_main(ii, data=data)
                                     elif data.dynamic in ["SP","SPP","CP"]:  # Static
                                         data.Prob = generateDailyProb(data, data.dynamic, 1,loc_dep=loc_dep, keepfiles=True)
@@ -374,8 +376,8 @@ if __name__ == "__main__":
                                         if (data.Prob < 0).any() or (data.Prob > 1).any():
                                             pd.DataFrame(np.array([data.theta, data.dd, ch, data.dynamic])).to_csv("error.csv")
                                         pool = mp.Pool(processes=data.processes)
-                                        results = pool.map(functools.partial(run_main, data=data), range(Imax))
-                                        # for ii in range(Imax):
+                                        results = pool.map(functools.partial(run_main, data=data), range(args.Imax))
+                                        # for ii in range(args.Imax):
                                         #    print run_main(ii, data=data)
 
                                     if results is not None:
@@ -383,11 +385,13 @@ if __name__ == "__main__":
                                         dat_C = pd.concat([result[2] for result in results])
                                         dat_C.to_csv(c_file, header=False)
                                         out = pd.DataFrame(np.array(
-                                            [np.repeat(data.dd, Imax), np.repeat(data.theta, Imax), np.repeat(ch, Imax),
-                                             np.repeat(data.dynamic, Imax),np.repeat(loc_dep, Imax),np.repeat(data.joint, Imax),np.repeat(dob,Imax), res]).T)
+                                            [np.repeat(data.dd, args.Imax), np.repeat(data.theta, args.Imax),
+                                             np.repeat(ch, args.Imax),
+                                             np.repeat(data.dynamic, args.Imax), np.repeat(loc_dep, args.Imax),
+                                             np.repeat(data.joint, args.Imax), np.repeat(dob, args.Imax), res]).T)
                                         out.to_csv(outfile, header=False)
                                         data.l[1,:,:] = np.copy(l_original)
-                                #for ii in range(Imax):
+                                # for ii in range(args.Imax):
                                 #    print(run_main(ii, data=data))
     outfile.close()
     c_file.close()

@@ -1,0 +1,10 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=16
+#PBS -l walltime=24:00:00
+#PBS -l pmem=5gb
+#PBS -m abe
+#PBS -M dua143@psu.edu
+
+cd /gpfs/work/dua143/PatSchedPang_v2/FairScheduling/gams_try
+module load gams
+/gpfs/work/dua143/anaconda/bin/python2.7 SimulationMain.py -i 48 -p 16 -s 2 -e 14 -t "1.25,1.5,1.75" -c 0,2 -l 1,2 -o "CP,SP,DP,DCPP" -j 0 -d 0 -n 2
