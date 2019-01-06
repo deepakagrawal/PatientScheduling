@@ -249,13 +249,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', "--Imax", help="Maximum Number of Iterations", type=int, default=1)
     parser.add_argument('-p', "--processes", help="Maximum Number of parallel processes to run", type=int, default=1)
-    parser.add_argument('-s', "--horizon", help="List of maximum number of days", type=int, nargs='+', default=2)
-    parser.add_argument('-t', "--theta", help="Overtime Undertime Penalty", type=float, nargs='+', default=1.25)
-    parser.add_argument('-c', "--choices", help="Choices", type=int, nargs='+', default=1)
-    parser.add_argument('-l', "--locations", help="Locations", type=int, nargs='+', default=1)
-    parser.add_argument('-o', "--policies", help="Policies to run", nargs='+', default="CP")
-    parser.add_argument('-j', '--joint', help="Run Joint Optimization Scenario", type=int, default=0)
-    parser.add_argument('-d', "--doubly", help="Doubly Stochastic or not", type=int, default=0)
+    parser.add_argument('-s', "--horizon", help="List of maximum number of days", type=int, nargs='+', default=[2])
+    parser.add_argument('-t', "--theta", help="Overtime Undertime Penalty", type=float, nargs='+', default=[1.25])
+    parser.add_argument('-c', "--choices", help="Choices", type=int, nargs='+', default=[1])
+    parser.add_argument('-l', "--locations", help="Locations", type=int, nargs='+', default=[1])
+    parser.add_argument('-o', "--policies", help="Policies to run", nargs='+', default=["CP"])
+    parser.add_argument('-j', '--joint', help="Run Joint Optimization Scenario", type=int, default=[0], nargs='+')
+    parser.add_argument('-d', "--doubly", help="Doubly Stochastic or not", type=int, default=[0], nargs='+')
     parser.add_argument('-n', "--nslots", help="Number of slots to run", type=int, default=1)
     args = parser.parse_args()
         # myopts, args = getopt.getopt(sys.argv[1:], 'i:p:s:t:c:l:o:j:d:n:')
@@ -321,10 +321,10 @@ if __name__ == "__main__":
     varray2 = 1.5 * tmp_demand
     data.tmpdir = tempfile.mkdtemp(dir = "/storage/work/dua143/PatSchedPang_v2/FairScheduling/gams_try")
     with open(data.tmpdir+"/params.txt","w") as params_file:
-        json.dumps(vars(args), params_file)
+        json.dump(vars(args), params_file)
     result_file = tempfile.NamedTemporaryFile(suffix='.csv',
                                               prefix='_'.join(
-                                                  args.policy) + 'testPaperSingleOpt_detLam_result_gen_loc_all_constant_Oct7_hammer',
+                                                  args.policies) + 'testPaperSingleOpt_detLam_result_gen_loc_all_constant_Oct7_hammer',
                                               dir=data.tmpdir, delete=False)
     C_file = tempfile.NamedTemporaryFile(suffix='.csv',
                                               prefix='C_table'+'testPaperSingleOpt_detLam_result_gen_loc_all_constant_Oct7_hammer',
@@ -346,7 +346,7 @@ if __name__ == "__main__":
                         data.v = calculate_choice(data.dd, data.dk, data.dt,data.dc, data.dl,ch,[varray1, varray2])
                         data.r = np.array([max(1 - 0.04 * j, 0.6) for j in range(data.dd)])
                         for data.theta in args.theta:
-                            for data.dynamic in args.policy:
+                            for data.dynamic in args.policies:
                                 for loc_dep in args.locations:
                                     data.Prob = np.zeros([data.dd, data.dk, data.dt, data.dc, data.dl])
                                     results = None
