@@ -23,7 +23,10 @@ class JointOptimizer(object):
     @staticmethod
     def get_model_text():
         return '''
-$title Sample.gms    
+$title Sample.gms
+$offlisting
+$offsymxref
+    
 Set      dj     
          kj
          tj     
@@ -102,11 +105,11 @@ P4D(dj,kj,lj,nj)
 Positive Variable x,u,C,alphaS,alphaD,P3S,P4S,P1D, P2D, P3D,P4D;
 Binary Variable cb;
 x.up(dj,kj,tj,cj,lj) = sign(v(dj,kj,tj,cj,lj));;
-u.up(cj,lj) = 1;
-u.lo(cj,lj) = 0;
-u.up(cj,lj)$(ord(cj) eq 1) = 0;
-u.lo(cj,lj)$(ord(cj) >= 3 and ord(cj) <=5 and ord(lj) eq 2) = 1;
-u.lo(cj,lj)$(ord(cj) >=6 and ord(lj) eq 1) = 1;
+*u.up(cj,lj) = 1;
+*u.lo(cj,lj) = 0;
+*u.up(cj,lj)$(ord(cj) eq 1) = 0;
+*u.lo(cj,lj)$(ord(cj) >= 3 and ord(cj) <=5 and ord(lj) eq 2) = 1;
+*u.lo(cj,lj)$(ord(cj) >=6 and ord(lj) eq 1) = 1;
 cb.up(kj,lj,i) = csign(kj,lj);
 P1S.up(kj,lj,nj) = 1;
 P2S.up(kj,lj,nj) = 1;
@@ -181,12 +184,13 @@ MODEL SP_loc_dep /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,capCon1,capCon2,alphaEqS
 MODEL DP_loc_dep /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,capCon1,capCon2,alphaEqD,P1eqD,P2eqD,P3eqD,P4eqD, total_profit_DP/;
 
 options
-limrow = 0,limcol = 0,reslim = 3000,optcr = 0.0, sysout = off;
+limrow = 0,limcol = 0,reslim = 3000,optcr = 0.0, sysout = off, solprint = off;
 
-option minlp = sbb;
+option 
+    minlp = sbb;
 
-DP_loc_dep.nodlim = 250000;
-*DP_loc_dep.nodlim = 2500;
+*DP_loc_dep.nodlim = 250000;
+DP_loc_dep.nodlim = 50000;
 DP_loc_dep.optfile = 1;
 $onecho >sbb.opt
 loginterval 15000
@@ -285,7 +289,10 @@ class SingleOptimizer(object):
     def get_model_text():
         return '''
 
-$title Sample.gms    
+$title Sample.gms
+$offlisting
+$offsymxref
+    
 Set      dj     
          kj
          tj
@@ -384,7 +391,7 @@ total_profit_SP         .. obj =e= sum((kj,lj,nj), prob(nj)*alphaS(kj,lj,nj)) -
                                    theta*sum((kj,lj,nj),prob(nj)*(alphaS(kj,lj,nj)*P1S(kj,lj,nj) - C(kj,lj)*P2S(kj,lj,nj) + C(kj,lj)*P3S(kj,lj,nj) - alphaS(kj,lj,nj)*P4S(kj,lj,nj)));
 total_profit_DP         .. obj =e= sum((dj,kj,lj,nj), alphaD(dj,kj,lj,nj)*prob(nj))-
                                    theta*sum((dj,kj,lj,nj),prob(nj)*(alphaD(dj,kj,lj,nj))*P1D(dj,kj,lj,nj) - C(kj,lj)*P2D(dj,kj,lj,nj) + C(kj,lj)*P3D(dj,kj,lj,nj) - alphaD(dj,kj,lj,nj)*P4D(dj,kj,lj,nj));
-eq1(kj,cj,lj)$(ord(cj) >= 3 and ord(kj) eq ord(cj)-2)      .. u(cj,lj) + sum((dj,tj), x(dj,kj,tj,cj,lj)) =e= 1;
+eq1(kj,cj,lj)$(ord(cj) >= 3 and ord(kj) eq ord(cj)-2)   .. u(cj,lj) + sum((dj,tj), x(dj,kj,tj,cj,lj)) =e= 1;
 eq2_loc_dep_1(cj)$(ord(cj) eq 2)      .. sum(lj, u(cj,lj) + sum((kj,dj,tj),x(dj,kj,tj,cj,lj))) =e= 1;
 eq3(dj,tj,cj,lj)$(ord(cj) eq 1 and ord(dj) eq 1)   .. sum(kj, x(dj,kj,tj,cj,lj)) =e= 1;
 eq3_1(tj,cj,lj)$(ord(cj) eq 1) .. sum((kj,dj)$(ord(dj) >1), x(dj,kj,tj,cj,lj)) + u(cj,lj) =e= 0;
@@ -409,7 +416,11 @@ MODEL SP_loc_dep /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqS,P1eqS,P2eqS,P3e
 MODEL DP_loc_dep /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqD,P1eqD,P2eqD,P3eqD,P4eqD, total_profit_DP/;
 
 option 
-   NLP = conopt;
+   NLP = conopt,
+    limcol = 0,
+    solprint = off,
+    sysout = off,
+    limrow = 0;
 
 
 If (Policy eq 0,
@@ -597,7 +608,7 @@ def fastroll(a):
 
 
 def generateDailyProb(data, dynamic=None, cumulative=None, schedule=None, i=None, loc_dep=1, keepfiles=True):
-    optim = JointOptimizer(keepfiles=keepfiles) if (data.joint == 1 & (dynamic == "DCPP" or dynamic == "DP" )) else SingleOptimizer(keepfiles=keepfiles)
+    optim = JointOptimizer(keepfiles=keepfiles) if (data.joint == 1) & (dynamic == "DCPP" or dynamic == "DP" ) else SingleOptimizer(keepfiles=keepfiles)
 
     y = None
     if dynamic in ["DP", "DCPP"]:

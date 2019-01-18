@@ -1,11 +1,8 @@
 from __future__ import division
 
-import getopt
 import itertools
 import multiprocessing as mp
-import sys
-import sys
-
+import os
 import argparse
 import functools
 import json
@@ -155,11 +152,11 @@ def run_main(iter, data=None):
         #     P = generateDailyProb(data, "DPP", 1, schedule, i, loc_dep=0)
         else:
             P = data.Prob
-        data.dat_C = data.dat_C.append({'Run':iter, 'Horizon':data.dd, 'Theta':data.tehta, 'Choice':data.ch, 'Policy':data.dynamic,
-                                        'Loc_Dep': loc_dep, 'Joint': args.joint[0], 'Doubly': dob, 'day': i,
-                                        'C11': data.C[0, 0], 'C12': data.C[0, 1],
-                      'C21':data.C[1,0], 'C22':data.C[1,1], 'C31':data.C[2,0], 'C32':data.C[2,1], 'C41':data.C[3,0],
-                      'C42':data.C[3,1], 'C51':data.C[4,0], 'C52':data.C[4,1]}, ignore_index=True)
+        # data.dat_C = data.dat_C.append({'Run':iter, 'Horizon':data.dd, 'Theta':data.tehta, 'Choice':data.ch, 'Policy':data.dynamic,
+        #                                 'Loc_Dep': loc_dep, 'Joint': args.joint[0], 'Doubly': dob, 'day': i,
+        #                                 'C11': data.C[0, 0], 'C12': data.C[0, 1],
+        #               'C21':data.C[1,0], 'C22':data.C[1,1], 'C31':data.C[2,0], 'C32':data.C[2,1], 'C41':data.C[3,0],
+        #               'C42':data.C[3,1], 'C51':data.C[4,0], 'C52':data.C[4,1]}, ignore_index=True)
         patgoing = np.zeros([data.dd, data.dk, data.dt,data.dc,data.dl])
         cancel = np.zeros([data.dd, data.dk,data.dt, data.dc,data.dl])
         left = np.zeros([data.dc,data.dl])
@@ -224,16 +221,12 @@ def calc_lambda(data,doubly):
     data.lprob = 1 if doubly is 0 else 3
     data.probl = [1.0] if doubly is 0 else (1.0/data.lprob)*np.ones(data.lprob)
     data.l = np.zeros([data.dc, data.dl,data.lprob])  # data.l=np.array([[2, 2, 6, 0], [2, 2, 0, 6]])
+    demand_urgent = np.sign(data.C)-(temp_new+temp_returning)
+
     for i in range(data.lprob):
-        data.l[0,:,i] = np.multiply(temp_demand,(1-(temp_new+temp_returning))).sum(axis=0) + \
-                        np.multiply(np.sign(np.multiply(temp_demand,(1-(temp_new+temp_returning))).sum(axis=0)),
-                                    ((data.lprob-1.0)/2-i)*(np.multiply(temp_demand,(1-(temp_new+temp_returning))).sum(axis=0))*0.1)
-        data.l[1,:,i] = np.multiply(temp_demand,temp_new).sum(axis=0) +\
-                        np.multiply(np.sign(np.multiply(temp_demand,temp_new).sum(axis=0)),
-                                    ((data.lprob - 1.0) / 2 - i) * (np.multiply(temp_demand, (1 - (temp_new + temp_returning))).sum(axis=0)) * 0.1)
-        data.l[2:,:,i]= np.multiply(temp_demand,temp_returning) + \
-                        np.multiply(np.sign(np.multiply(temp_demand,temp_returning).sum(axis=0)),
-                                    ((data.lprob-1.0)/2-i)*(np.multiply(temp_demand,(1-(temp_new+temp_returning))).sum(axis=0))*0.1)
+        data.l[0,:,i] = (np.multiply(temp_demand,demand_urgent) + np.multiply(np.sign(np.multiply(temp_demand,demand_urgent)),((data.lprob-1.0)/2-i)*(np.multiply(temp_demand,demand_urgent))*0.1)).sum(axis=0)
+        data.l[1, :, i] = (np.multiply(temp_demand, temp_new) + np.multiply(np.sign(np.multiply(temp_demand, temp_new)),((data.lprob - 1.0) / 2 - i) * (np.multiply(temp_demand,temp_new)) * 0.1)).sum(axis=0)
+        data.l[2:,:,i]= (np.multiply(temp_demand,temp_returning) + np.multiply(np.sign(np.multiply(temp_demand,temp_returning)),((data.lprob-1.0)/2-i)*(np.multiply(temp_demand,temp_returning))*0.1))
     data.simL = np.copy(data.l)
     data.simL[0,:,:] = data.simL[0,:,:]/data.dt
     data.ldist = np.array(
@@ -241,11 +234,8 @@ def calc_lambda(data,doubly):
     l_original = np.copy(data.l[1, :, :])
     return l_original
 
+
 if __name__ == "__main__":
-    # if len(sys.argv) == 1:
-    #     Imax, processes, horizon, theta, dchoice_a, dchoice_b, loc_a, loc_b, policy, joint, doubly, nslots\
-    #         = 1, 1, [2], [1.25], 1, 2, 1, 2, ["DCPP"], [1], [0], 2
-    # else:
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', "--Imax", help="Maximum Number of Iterations", type=int, default=1)
     parser.add_argument('-p', "--processes", help="Maximum Number of parallel processes to run", type=int, default=1)
@@ -257,38 +247,22 @@ if __name__ == "__main__":
     parser.add_argument('-j', '--joint', help="Run Joint Optimization Scenario", type=int, default=[0], nargs='+')
     parser.add_argument('-d', "--doubly", help="Doubly Stochastic or not", type=int, default=[0], nargs='+')
     parser.add_argument('-n', "--nslots", help="Number of slots to run", type=int, default=1)
+    parser.add_argument('-T', "--Tmax", help="Maximum duration", default=50, type=int)
+    parser.add_argument('-D', "--day0", help="warm up period", default=20, type=int)
+    parser.add_argument('-f', "--file", help="Capacity Demand File", default='new_dem_cap_loc_data.csv')
+    parser.add_argument('-F', "--tempsuffix", help="Folder Suffix", default="")
+    parser.add_argument('-I', "--ParImax", help="Should each iteration be in parallel", action='store_true')
+    parser.add_argument('-z', "--folder", help="Folder to write the results")
     args = parser.parse_args()
-        # myopts, args = getopt.getopt(sys.argv[1:], 'i:p:s:t:c:l:o:j:d:n:')
-        # for o,a in myopts:
-        #     if o == "-i":
-        #         Imax = int(a)
-        #     elif o=="-p":
-        #         processes = int(a)
-        #     elif o== "-s":
-        #         horizon = [int(i) for i in a.split(",")]
-        #     elif o=="-t":
-        #         theta = [float(i) for i in a.split(",")]
-        #     elif o=="-c":
-        #         dchoice_a,dchoice_b = [int(i) for i in a.split(",")]
-        #     elif o=="-l":
-        #         loc_a,loc_b = [int(i) for i in a.split(",")]
-        #     elif o=="-o":
-        #         policy = a.split(",")
-        #     elif o=="-j":
-        #         joint = [int(a)]
-        #     elif o== "-d":
-        #         doubly = [int(a)]
-        #     else:
-        #         nslots = int(a)
 
-    dat = pd.read_csv('new_dem_cap_loc_data.csv')
+    dat = pd.read_csv(args.file)
 
     data = Options()   # Create data structure
-    data.Tmax = 30
-    data.day0 = 15
+    data.Tmax = args.Tmax
+    data.day0 = args.day0
     data.dk = dat.Provider.unique().shape[0]
     data.dt = args.nslots
-    data.CAP = 30
+    data.CAP = 20
 
     data.dc = data.dk + 2
     data.dl = dat.Clinic.unique().shape[0]
@@ -309,7 +283,7 @@ if __name__ == "__main__":
     data.gamma = np.ones(data.dk)
 
 
-    step = 5
+    # step = 5
 
     # horizon = range(start, end, step)
     demand = dat[["Provider", "Clinic", "Daily_Demand"]].pivot(index="Provider", columns="Clinic",
@@ -319,82 +293,87 @@ if __name__ == "__main__":
     demand[demand != 0] = 5
     varray1 = calcFun(data.dk,data.dl,args.horizon[-1],demand)
     varray2 = 1.5 * tmp_demand
-    data.tmpdir = tempfile.mkdtemp(dir = "/storage/work/dua143/PatSchedPang_v2/FairScheduling/gams_try")
+    if not os.path.exists(f"/storage/work/dua143/PatSchedPang_v2/FairScheduling/gams_try/{args.folder}"):
+        os.mkdir(f"/storage/work/dua143/PatSchedPang_v2/FairScheduling/gams_try/{args.folder}")
+    data.tmpdir = tempfile.mkdtemp(dir = f"/storage/work/dua143/PatSchedPang_v2/FairScheduling/gams_try/{args.folder}", suffix=args.tempsuffix)
     with open(data.tmpdir+"/params.txt","w") as params_file:
         json.dump(vars(args), params_file)
     result_file = tempfile.NamedTemporaryFile(suffix='.csv',
                                               prefix='_'.join(
-                                                  args.policies) + 'testPaperSingleOpt_detLam_result_gen_loc_all_constant_Oct7_hammer',
+                                                  args.policies),
                                               dir=data.tmpdir, delete=False)
-    C_file = tempfile.NamedTemporaryFile(suffix='.csv',
-                                              prefix='C_table'+'testPaperSingleOpt_detLam_result_gen_loc_all_constant_Oct7_hammer',
-                                              dir=data.tmpdir,delete=False)
-    data.dat_C = pd.DataFrame(columns = ['Run','Horizon','Theta','Choice','Policy','Loc_Dep','Joint','Doubly','day','C11','C12','C21','C22','C31','C32','C41','C42','C51','C52'])
-    dat_C = data.dat_C.copy()
-    c_file = open(C_file.name,'w')
-    c_file.write('%s'%','.join(map(str,['Run','Horizon','Theta','Choice','Policy','Loc_Dep','Joint','Doubly','day','C11','C12','C21','C22','C31','C32','C41','C42','C51','C52'])))
-    c_file.write('\n')
-    with open(result_file.name, 'w') as outfile:
-        outfile.write('%s' % ','.join(map(str, ['Run','Horizon','Theta','Choice','Policy','Loc_Dep','Joint','Doubly','Profit'])))
-        outfile.write('\n')
 
-        for dob in args.doubly:
-            l_original = calc_lambda(data,dob)
-            for data.joint in args.joint:
-                for ch in args.choices:
-                    for data.dd in args.horizon:
-                        data.v = calculate_choice(data.dd, data.dk, data.dt,data.dc, data.dl,ch,[varray1, varray2])
-                        data.r = np.array([max(1 - 0.04 * j, 0.6) for j in range(data.dd)])
-                        for data.theta in args.theta:
-                            for data.dynamic in args.policies:
-                                for loc_dep in args.locations:
-                                    data.Prob = np.zeros([data.dd, data.dk, data.dt, data.dc, data.dl])
-                                    results = None
-                                    data.l[1,:,:] = l_original.copy()
-                                    data.l[1, :, :] = data.l[1, :, :].sum(axis=0) if loc_dep is 1 else data.l[1, :, :]
-                                    # flex_data = float(data.l[1, 0, :]) if dob == 0 else list(data.l[1,0,:])
-                                    data.C = Cold.copy()
-                                    if data.dynamic == "DP":  # Dynamic
-                                        data.Prob = generateDailyProb(data, "SP",loc_dep=loc_dep)
-                                        if (data.Prob < 0).any() or (data.Prob > 1).any():
-                                            pd.DataFrame(np.array([data.theta, data.dd, ch, data.dynamic])).to_csv("error.csv")
+    for dob in args.doubly:
+        l_original = calc_lambda(data,dob)
+        for data.joint in args.joint:
+            for ch in args.choices:
+                for data.dd in args.horizon:
+                    data.v = calculate_choice(data.dd, data.dk, data.dt,data.dc, data.dl,ch,[varray1, varray2])
+                    data.r = np.array([max(1 - 0.04 * j, 0.6) for j in range(data.dd)])
+                    for data.theta in args.theta:
+                        for data.dynamic in args.policies:
+                            for loc_dep in args.locations:
+                                data.Prob = np.zeros([data.dd, data.dk, data.dt, data.dc, data.dl])
+                                results = None
+                                data.l[1,:,:] = l_original.copy()
+                                data.l[1, :, :] = data.l[1, :, :].sum(axis=0) if loc_dep is 1 else data.l[1, :, :]
+                                # flex_data = float(data.l[1, 0, :]) if dob == 0 else list(data.l[1,0,:])
+                                data.C = Cold.copy()
+                                if data.dynamic == "DP":  # Dynamic
+                                    data.Prob = generateDailyProb(data, "SP",loc_dep=loc_dep)
+                                    if (data.Prob < 0).any() or (data.Prob > 1).any():
+                                        pd.DataFrame(np.array([data.theta, data.dd, ch, data.dynamic])).to_csv("error.csv")
+                                    if not args.ParImax:
                                         pool = mp.Pool(processes=data.processes)
                                         results = pool.map(functools.partial(run_main, data=data), range(args.Imax))
-                                        # for ii in range(args.Imax):
-                                        #    print run_main(ii, data=data)
-                                    elif data.dynamic == "DCPP":
-                                        data.Prob = generateDailyProb(data, "CP", loc_dep=loc_dep)
-                                        if (data.Prob < 0).any() or (data.Prob > 1).any():
-                                            pd.DataFrame(np.array([data.theta, data.dd, ch, data.dynamic])).to_csv("error.csv")
+                                    else:
+                                        results = run_main(args.Imax, data=data)
+                                elif data.dynamic == "DCPP":
+                                    data.Prob = generateDailyProb(data, "CP", loc_dep=loc_dep)
+                                    if (data.Prob < 0).any() or (data.Prob > 1).any():
+                                        pd.DataFrame(np.array([data.theta, data.dd, ch, data.dynamic])).to_csv("error.csv")
+                                    if not args.ParImax:
                                         pool = mp.Pool(processes=data.processes)
                                         results = pool.map(functools.partial(run_main, data=data), range(args.Imax))
-                                        # for ii in range(args.Imax):
-                                        #    run_main(ii, data=data)
-                                    elif data.dynamic in ["SP","SPP","CP"]:  # Static
-                                        data.Prob = generateDailyProb(data, data.dynamic, 1,loc_dep=loc_dep, keepfiles=True)
-                                        # break
-                                        if (data.Prob < 0).any() or (data.Prob > 1).any():
-                                            pd.DataFrame(np.array([data.theta, data.dd, ch, data.dynamic])).to_csv("error.csv")
+                                    else:
+                                        results = run_main(args.Imax, data=data)
+                                elif data.dynamic in ["SP","SPP","CP"]:  # Static
+                                    data.Prob = generateDailyProb(data, data.dynamic, 1,loc_dep=loc_dep, keepfiles=True)
+                                    # break
+                                    if (data.Prob < 0).any() or (data.Prob > 1).any():
+                                        pd.DataFrame(np.array([data.theta, data.dd, ch, data.dynamic])).to_csv("error.csv")
+                                    if not args.ParImax:
                                         pool = mp.Pool(processes=data.processes)
                                         results = pool.map(functools.partial(run_main, data=data), range(args.Imax))
-                                        # for ii in range(args.Imax):
-                                        #    print run_main(ii, data=data)
+                                    else:
+                                        results = run_main(args.Imax, data=data)
 
-                                    if results is not None:
+                                if results is not None:
+                                    if args.ParImax:
+                                        res = np.array(results[0])
+                                        rep_no = 1
+                                        run_no = [args.Imax]
+                                    else:
                                         res = np.array([result[0] for result in results])
-                                        dat_C = pd.concat([result[2] for result in results])
-                                        dat_C.to_csv(c_file, header=False)
-                                        out = pd.DataFrame(np.array(
-                                            [np.repeat(data.dd, args.Imax), np.repeat(data.theta, args.Imax),
-                                             np.repeat(ch, args.Imax),
-                                             np.repeat(data.dynamic, args.Imax), np.repeat(loc_dep, args.Imax),
-                                             np.repeat(data.joint, args.Imax), np.repeat(dob, args.Imax), res]).T)
-                                        out.to_csv(outfile, header=False)
-                                        data.l[1,:,:] = np.copy(l_original)
-                                # for ii in range(args.Imax):
-                                #    print(run_main(ii, data=data))
-    outfile.close()
-    c_file.close()
+                                        rep_no = args.Imax
+                                        run_no = np.arange(0,args.Imax)
+
+                                    # dat_C = pd.concat([result[2] for result in results])
+                                    # dat_C.to_csv(c_file, header=False
+                                    out = pd.DataFrame({'Run': run_no,'Horizon':np.repeat(data.dd, rep_no),
+                                                        'Theta': np.repeat(data.theta, rep_no),'Choice': np.repeat(ch, rep_no),
+                                                        'Policy': np.repeat(data.dynamic, rep_no),'Loc_Dep':np.repeat(loc_dep, rep_no),
+                                                        'Joint': np.repeat(data.joint, rep_no),'Doubly': np.repeat(dob, rep_no),
+                                                        'Profit': res})
+                                    if os.stat(result_file.name).st_size >0:
+                                        out.to_csv(result_file.name, header=False, mode='a', index=False)
+                                    else:
+                                        out.to_csv(result_file.name, header=True, mode='w', index=False)
+                                    data.l[1,:,:] = np.copy(l_original)
+                            # for ii in range(args.Imax):
+                            #    print(run_main(ii, data=data))
+    # outfile.close()
+    # c_file.close()
     # pivot_tab = tempfile.NamedTemporaryFile(suffix='.csv',prefix='_'.join(policy) + 'pivot_table',dir=data.tmpdir, delete=False)
     # out.columns = ['Horizon','Theta','Choice','Policy','Loc_Dep','Joint','Doubly','Profit']
     # out["Profit"] = out["Profit"].astype(float)
