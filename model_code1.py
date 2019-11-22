@@ -104,13 +104,18 @@ P4D(dj,kj,lj,nj)
 
 Positive Variable x,u,C,alphaS,alphaD,P3S,P4S,P1D, P2D, P3D,P4D;
 Binary Variable cb;
-x.up(dj,kj,tj,cj,lj) = sign(v(dj,kj,tj,cj,lj));;
+x.up(dj,kj,tj,cj,lj) = sign(v(dj,kj,tj,cj,lj));
+u.up(cj,lj) = 1;
+*x.l(dj,kj,tj,cj,lj) = z(dj,kj,tj,cj,lj);
 *u.up(cj,lj) = 1;
 *u.lo(cj,lj) = 0;
 *u.up(cj,lj)$(ord(cj) eq 1) = 0;
 *u.lo(cj,lj)$(ord(cj) >= 3 and ord(cj) <=5 and ord(lj) eq 2) = 1;
 *u.lo(cj,lj)$(ord(cj) >=6 and ord(lj) eq 1) = 1;
 cb.up(kj,lj,i) = csign(kj,lj);
+cb.lo(kj,lj,i)$(ord(i) <= C_start(kj,lj)-8) = csign(kj,lj);
+*cb.lo(kj,lj,i)$(ord(i)<=7)  = csign(kj,lj);
+cb.up(kj,lj,i)$(ord(i)>= C_start(kj,lj) + 3) = 0;
 P1S.up(kj,lj,nj) = 1;
 P2S.up(kj,lj,nj) = 1;
 P3S.up(kj,lj,nj) = 1;
@@ -120,7 +125,7 @@ P2D.up(dj,kj,lj,nj) = 1;
 P3D.up(dj,kj,lj,nj) = 1;
 P4D.up(dj,kj,lj,nj) = 1;
 
-cb.l(kj,lj,i)$(ord(i)<= C_start(kj,lj)+1) = 1;
+*cb.l(kj,lj,i)$(ord(i)<= C_start(kj,lj)+1) = 1;
 
 *display u.lo, x.up;
 
@@ -172,7 +177,7 @@ P3eqS(kj,lj,nj)      .. P3S(kj,lj,nj) =e= exp(-alphaS(kj,lj,nj))*(sum(i$(ord(i)<
 P4eqS(kj,lj,nj)      .. P4S(kj,lj,nj) =e= exp(-alphaS(kj,lj,nj))*(sum(i$(ord(i)<=CAP-1), cb(kj,lj,i+2)*alphaS(kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
 
 *********** Dynamic
-alphaEqD(dj,kj,lj,nj)   .. alphaD(dj,kj,lj,nj) =e= sum((cj,di,dx)$((ord(dx) eq ord(di)+ord(dj)-1) and (ord(di) ge 1) and (ord(di) le dd +1 - ord(dj))),sum(tj,y(kj,cj,lj,tj,di,dx))*rt(dx,di)) + 
+alphaEqD(dj,kj,lj,nj)   .. alphaD(dj,kj,lj,nj) =e= 0.0001+sum((cj,di,dx)$((ord(dx) eq ord(di)+ord(dj)-1) and (ord(di) ge 1) and (ord(di) le dd +1 - ord(dj))),sum(tj,y(kj,cj,lj,tj,di,dx))*rt(dx,di)) + 
 sum(cj,L(cj,lj,nj)*r(dj)*sum(tj,x(dj,kj,tj,cj,lj))) + sum((cj,di)$((ord(di) ge 1) and (ord(di) le ord(dj)-1)),L(cj,lj,nj)*r(di)*sum(tj,z(di,kj,tj,cj,lj)));
 P1eqD(dj,kj,lj,nj)      .. P1D(dj,kj,lj,nj) =e= 1 - exp(-alphaD(dj,kj,lj,nj))*(sum(i$(ord(i)<=CAP), cb(kj,lj,i+1)*alphaD(dj,kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
 P2eqD(dj,kj,lj,nj)      .. P2D(dj,kj,lj,nj) =e= 1 - exp(-alphaD(dj,kj,lj,nj))*(sum(i$(ord(i)<=CAP+1), cb(kj,lj,i)*alphaD(dj,kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
@@ -184,19 +189,28 @@ MODEL SP_loc_dep /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,capCon1,capCon2,alphaEqS
 MODEL DP_loc_dep /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,capCon1,capCon2,alphaEqD,P1eqD,P2eqD,P3eqD,P4eqD, total_profit_DP/;
 
 options
-limrow = 0,limcol = 0,reslim = 3000,optcr = 0.0, sysout = off, solprint = off;
+limrow = 0,limcol = 0,reslim = 1000,optcr = 0.0, sysout = off, solprint = off;
 
 option 
-    minlp = sbb;
+    minlp = couenne, nlp=knitro;
 
-*DP_loc_dep.nodlim = 250000;
-DP_loc_dep.nodlim = 50000;
+DP_loc_dep.nodlim = 250000;
+*DP_loc_dep.nodlim = 20000;
 DP_loc_dep.optfile = 1;
 $onecho >sbb.opt
+subsolver knitro
 loginterval 15000
 loglevel 0
 memnodes 250000
-varsel 3
+nodesel 0
+intsollim 1
+$offecho
+
+$onecho>knitro.opt
+mip_heuristic 3
+mip_method 2
+mip_branchrule 2
+mip_selectrule 3
 $offecho
 
 solve DP_loc_dep using minlp maximizing obj;
@@ -319,6 +333,8 @@ Parameter
          rt(dj,dj)
          st(dj,dj) 
          C(kj,lj)
+         gm(kj,lj)
+         bt(kj,lj)
          csign(kj,lj)
          L(cj,lj,nj)
          prob(nj)
@@ -330,7 +346,7 @@ Parameter
 
 $if not set gdxincname $abort 'no include file name for data file provided'
 $gdxin %gdxincname%
-$load dj,kj,tj,cj,lj,nj,dd,theta,CAP,v,r,s,C,csign,L,prob, Policy,y,z, loc_dep
+$load dj,kj,tj,cj,lj,nj,dd,theta,CAP,v,r,s,C,gm,bt,csign,L,prob, Policy,y,z, loc_dep
 $gdxin
 
 rt(dj,di)$(ord(di) le ord(dj)) = max(0.6,1 - 0.04*(ord(dj) - ord(di)));
@@ -387,10 +403,10 @@ P3eqD(dj,kj,lj,nj)
 P4eqD(dj,kj,lj,nj)
 ;
 
-total_profit_SP         .. obj =e= sum((kj,lj,nj), prob(nj)*alphaS(kj,lj,nj)) - 
-                                   theta*sum((kj,lj,nj),prob(nj)*(alphaS(kj,lj,nj)*P1S(kj,lj,nj) - C(kj,lj)*P2S(kj,lj,nj) + C(kj,lj)*P3S(kj,lj,nj) - alphaS(kj,lj,nj)*P4S(kj,lj,nj)));
+total_profit_SP         .. obj =e= sum((kj,lj,nj), prob(nj)*alphaS(kj,lj,nj)*(csign(kj,lj)-bt(kj,lj)*(csign(kj,lj)-gm(kj,lj)))) - 
+                                   theta*sum((kj,lj,nj),prob(nj)*(alphaS(kj,lj,nj)*P1S(kj,lj,nj) - gm(kj,lj)*C(kj,lj)*P2S(kj,lj,nj) + gm(kj,lj)*C(kj,lj)*P3S(kj,lj,nj) - alphaS(kj,lj,nj)*P4S(kj,lj,nj)));
 total_profit_DP         .. obj =e= sum((dj,kj,lj,nj), alphaD(dj,kj,lj,nj)*prob(nj))-
-                                   theta*sum((dj,kj,lj,nj),prob(nj)*(alphaD(dj,kj,lj,nj))*P1D(dj,kj,lj,nj) - C(kj,lj)*P2D(dj,kj,lj,nj) + C(kj,lj)*P3D(dj,kj,lj,nj) - alphaD(dj,kj,lj,nj)*P4D(dj,kj,lj,nj));
+                                   theta*sum((dj,kj,lj,nj),prob(nj)*(alphaD(dj,kj,lj,nj))*P1D(dj,kj,lj,nj) - gm(kj,lj)*C(kj,lj)*P2D(dj,kj,lj,nj) + gm(kj,lj)*C(kj,lj)*P3D(dj,kj,lj,nj) - alphaD(dj,kj,lj,nj)*P4D(dj,kj,lj,nj));
 eq1(kj,cj,lj)$(ord(cj) >= 3 and ord(kj) eq ord(cj)-2)   .. u(cj,lj) + sum((dj,tj), x(dj,kj,tj,cj,lj)) =e= 1;
 eq2_loc_dep_1(cj)$(ord(cj) eq 2)      .. sum(lj, u(cj,lj) + sum((kj,dj,tj),x(dj,kj,tj,cj,lj))) =e= 1;
 eq3(dj,tj,cj,lj)$(ord(cj) eq 1 and ord(dj) eq 1)   .. sum(kj, x(dj,kj,tj,cj,lj)) =e= 1;
@@ -404,7 +420,7 @@ P2eqS(kj,lj,nj)      .. P2S(kj,lj,nj) =e= 1 - exp(-alphaS(kj,lj,nj))*(sum(i$(ord
 P3eqS(kj,lj,nj)      .. P3S(kj,lj,nj) =e= exp(-alphaS(kj,lj,nj))*(sum(i$(ord(i)<=ceil(C(kj,lj))), alphaS(kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
 P4eqS(kj,lj,nj)      .. P4S(kj,lj,nj) =e= exp(-alphaS(kj,lj,nj))*(sum(i$(ord(i)<=ceil(C(kj,lj))-sign(C(kj,lj))), alphaS(kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
 *********** Dynamic
-alphaEqD(dj,kj,lj,nj)   .. alphaD(dj,kj,lj,nj) =e= sum((cj,di,dx)$((ord(dx) eq ord(di)+ord(dj)-1) and (ord(di) ge 1) and (ord(di) le dd +1 - ord(dj))),sum(tj,y(kj,cj,lj,tj,di,dx))*rt(dx,di)) + 
+alphaEqD(dj,kj,lj,nj)   .. alphaD(dj,kj,lj,nj) =e= 0.000001+sum((cj,di,dx)$((ord(dx) eq ord(di)+ord(dj)-1) and (ord(di) ge 1) and (ord(di) le dd +1 - ord(dj))),sum(tj,y(kj,cj,lj,tj,di,dx))*rt(dx,di)) + 
 sum(cj,L(cj,lj,nj)*r(dj)*sum(tj,x(dj,kj,tj,cj,lj))) + sum((cj,di)$((ord(di) ge 1) and (ord(di) le ord(dj)-1)),L(cj,lj,nj)*r(di)*sum(tj,z(di,kj,tj,cj,lj)));
 P1eqD(dj,kj,lj,nj)      .. P1D(dj,kj,lj,nj) =e= 1 - exp(-alphaD(dj,kj,lj,nj))*(sum(i$(ord(i)<=floor(C(kj,lj))), alphaD(dj,kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
 P2eqD(dj,kj,lj,nj)      .. P2D(dj,kj,lj,nj) =e= 1 - exp(-alphaD(dj,kj,lj,nj))*(sum(i$(ord(i)<=floor(C(kj,lj))+1), alphaD(dj,kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
@@ -416,7 +432,7 @@ MODEL SP_loc_dep /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqS,P1eqS,P2eqS,P3e
 MODEL DP_loc_dep /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqD,P1eqD,P2eqD,P3eqD,P4eqD, total_profit_DP/;
 
 option 
-   NLP = conopt,
+   NLP = knitro,
     limcol = 0,
     solprint = off,
     sysout = off,
@@ -468,6 +484,8 @@ Elseif Policy eq 2,
         s = db.add_parameter_dc('s', [dj], "show up prob")
         L = db.add_parameter_dc('L', [cj, lj, nj], "arrival rate")
         C = db.add_parameter_dc('C', [kj, lj], "Capacity Constraint Parameter")
+        gm = db.add_parameter_dc('gm', [kj,lj], "1 - physician cancellation prob")
+        bt = db.add_parameter_dc('bt', [kj,lj], "1 - ")
         csign = db.add_parameter_dc('csign', [kj, lj], "Capacity Constraint Parameter")
         prob = db.add_parameter_dc('prob', [nj], "doubly stochastic prob")
         y = db.add_parameter_dc('y', [kj, cj, lj, tj, dj, dj], 'Current Schedule')
@@ -482,6 +500,10 @@ Elseif Policy eq 2,
             L.add_record([str(i + 1) for i in key]).value = val
         for key, val in np.ndenumerate(data.C):
             C.add_record([str(i + 1) for i in key]).value = val
+        for key, val in np.ndenumerate(data.gamma):
+            gm.add_record([str(i + 1) for i in key]).value = val
+        for key, val in np.ndenumerate(data.beta):
+            bt.add_record([str(i + 1) for i in key]).value = val
         for key, val in np.ndenumerate(data.csign):
             csign.add_record([str(i + 1) for i in key]).value = val
         for key, val in np.ndenumerate(data.probl):
