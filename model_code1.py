@@ -9,7 +9,7 @@ import scipy.optimize as opt
 import shutil
 
 
-class JointOptimizer(object):
+class JointMINLPOptimizer(object):
     ws = None
 
     def __init__(self, keepfiles=False):
@@ -109,13 +109,13 @@ u.up(cj,lj) = 1;
 *x.l(dj,kj,tj,cj,lj) = z(dj,kj,tj,cj,lj);
 *u.up(cj,lj) = 1;
 *u.lo(cj,lj) = 0;
-*u.up(cj,lj)$(ord(cj) eq 1) = 0;
+u.up(cj,lj)$(ord(cj) eq 1) = 0;
 *u.lo(cj,lj)$(ord(cj) >= 3 and ord(cj) <=5 and ord(lj) eq 2) = 1;
 *u.lo(cj,lj)$(ord(cj) >=6 and ord(lj) eq 1) = 1;
 cb.up(kj,lj,i) = csign(kj,lj);
-cb.lo(kj,lj,i)$(ord(i) <= C_start(kj,lj)-8) = csign(kj,lj);
+*cb.lo(kj,lj,i)$(ord(i) <= C_start(kj,lj)-8) = csign(kj,lj);
 *cb.lo(kj,lj,i)$(ord(i)<=7)  = csign(kj,lj);
-cb.up(kj,lj,i)$(ord(i)>= C_start(kj,lj) + 3) = 0;
+*cb.up(kj,lj,i)$(ord(i)>= C_start(kj,lj) + 3) = 0;
 P1S.up(kj,lj,nj) = 1;
 P2S.up(kj,lj,nj) = 1;
 P3S.up(kj,lj,nj) = 1;
@@ -168,7 +168,7 @@ eq4(dj,kj,tj,cj,lj)$(ord(cj) eq 2)  .. x(dj,kj,tj,cj,lj)-v(dj,kj,tj,cj,lj)*sum(l
 eq4_1(dj,kj,tj,cj,lj)$(ord(cj) > 2 and ord(kj) eq ord(cj) -2)  .. x(dj,kj,tj,cj,lj)-v(dj,kj,tj,cj,lj)*u(cj,lj) =l= 0;
 capCon1(kj,lj,i)$(ord(i)<=CAP+1)  .. cb(kj,lj,i) =g= cb(kj,lj,i+1);
 capCon2(kj,lj)                 .. C(kj,lj) =e= sum(i$(ord(i)<=CAP+1),cb(kj,lj,i));
-capCon4         .. sum((kj,lj),C(kj,lj)) =l= 50;
+capCon4         .. sum((kj,lj),C(kj,lj)) =l= 15;
 *********** Static
 alphaEqS(kj,lj,nj)   .. alphaS(kj,lj,nj) =e= sum((dj,cj,tj), L(cj,lj,nj)*r(dj)*x(dj,kj,tj,cj,lj));
 P1eqS(kj,lj,nj)      .. P1S(kj,lj,nj) =e= 1 - exp(-alphaS(kj,lj,nj))*(sum(i$(ord(i)<=CAP), cb(kj,lj,i+1)*alphaS(kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
@@ -192,7 +192,7 @@ options
 limrow = 0,limcol = 0,reslim = 1000,optcr = 0.0, sysout = off, solprint = off;
 
 option 
-    minlp = couenne, nlp=knitro;
+    minlp = knitro;
 
 DP_loc_dep.nodlim = 250000;
 *DP_loc_dep.nodlim = 20000;
@@ -389,7 +389,8 @@ eq2_loc_dep_1(cj)             Sum of probability 1 for flexible class when loc_d
 eq2_loc_dep_0(cj,lj)             Sum of probability 1 for flexible class when loc_dep = 0
 eq3(dj,tj,cj,lj)       Sum of probability 1 for urgent class
 eq3_1(tj,cj,lj)        Sum of probability 1 for urgent class
-eq4(dj,kj,tj,cj,lj) choice constraint
+eq4(dj,kj,tj,cj,lj) choice constraint for flexible class
+eq4_loc_dep_0(dj,kj,tj,cj,lj) choice constraint for flexible class
 eq4_1(dj,kj,tj,cj,lj)
 alphaEqS(kj,lj,nj)
 P1eqS(kj,lj,nj)
@@ -403,15 +404,17 @@ P3eqD(dj,kj,lj,nj)
 P4eqD(dj,kj,lj,nj)
 ;
 
-total_profit_SP         .. obj =e= sum((kj,lj,nj), prob(nj)*alphaS(kj,lj,nj)*(csign(kj,lj)-bt(kj,lj)*(csign(kj,lj)-gm(kj,lj)))) - 
+total_profit_SP         .. obj =e= sum((kj,lj,nj), prob(nj)*alphaS(kj,lj,nj)*(1-bt(kj,lj)*(1-gm(kj,lj)))) - 
                                    theta*sum((kj,lj,nj),prob(nj)*(alphaS(kj,lj,nj)*P1S(kj,lj,nj) - gm(kj,lj)*C(kj,lj)*P2S(kj,lj,nj) + gm(kj,lj)*C(kj,lj)*P3S(kj,lj,nj) - alphaS(kj,lj,nj)*P4S(kj,lj,nj)));
 total_profit_DP         .. obj =e= sum((dj,kj,lj,nj), alphaD(dj,kj,lj,nj)*prob(nj))-
                                    theta*sum((dj,kj,lj,nj),prob(nj)*(alphaD(dj,kj,lj,nj))*P1D(dj,kj,lj,nj) - gm(kj,lj)*C(kj,lj)*P2D(dj,kj,lj,nj) + gm(kj,lj)*C(kj,lj)*P3D(dj,kj,lj,nj) - alphaD(dj,kj,lj,nj)*P4D(dj,kj,lj,nj));
 eq1(kj,cj,lj)$(ord(cj) >= 3 and ord(kj) eq ord(cj)-2)   .. u(cj,lj) + sum((dj,tj), x(dj,kj,tj,cj,lj)) =e= 1;
 eq2_loc_dep_1(cj)$(ord(cj) eq 2)      .. sum(lj, u(cj,lj) + sum((kj,dj,tj),x(dj,kj,tj,cj,lj))) =e= 1;
+eq2_loc_dep_0(cj,lj)$(ord(cj) eq 2)      .. u(cj,lj) + sum((kj,dj,tj),x(dj,kj,tj,cj,lj)) =e= 1;
 eq3(dj,tj,cj,lj)$(ord(cj) eq 1 and ord(dj) eq 1)   .. sum(kj, x(dj,kj,tj,cj,lj)) =e= 1;
 eq3_1(tj,cj,lj)$(ord(cj) eq 1) .. sum((kj,dj)$(ord(dj) >1), x(dj,kj,tj,cj,lj)) + u(cj,lj) =e= 0;
 eq4(dj,kj,tj,cj,lj)$(ord(cj) eq 2)  .. x(dj,kj,tj,cj,lj)-v(dj,kj,tj,cj,lj)*sum(li$(ord(lj) eq ord(li)),u(cj,lj)) =l= 0;
+eq4_loc_dep_0(dj,kj,tj,cj,lj)$(ord(cj) eq 2)  .. x(dj,kj,tj,cj,lj)-v(dj,kj,tj,cj,lj)*u(cj,lj) =l= 0;
 eq4_1(dj,kj,tj,cj,lj)$(ord(cj) > 2 and ord(kj) eq ord(cj) -2)  .. x(dj,kj,tj,cj,lj)-v(dj,kj,tj,cj,lj)*u(cj,lj) =l= 0;
 *********** Static
 alphaEqS(kj,lj,nj)   .. alphaS(kj,lj,nj) =e= sum((dj,cj,tj), L(cj,lj,nj)*r(dj)*x(dj,kj,tj,cj,lj));
@@ -428,8 +431,10 @@ P3eqD(dj,kj,lj,nj)      .. P3D(dj,kj,lj,nj) =e= exp(-alphaD(dj,kj,lj,nj))*(sum(i
 P4eqD(dj,kj,lj,nj)      .. P4D(dj,kj,lj,nj) =e= exp(-alphaD(dj,kj,lj,nj))*(sum(i$(ord(i)<=ceil(C(kj,lj))-2), alphaD(dj,kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
 
 
-MODEL SP_loc_dep /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqS,P1eqS,P2eqS,P3eqS,P4eqS, total_profit_SP/;
-MODEL DP_loc_dep /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqD,P1eqD,P2eqD,P3eqD,P4eqD, total_profit_DP/;
+MODEL SP_loc_dep_1 /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqS,P1eqS,P2eqS,P3eqS,P4eqS, total_profit_SP/;
+MODEL DP_loc_dep_1 /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqD,P1eqD,P2eqD,P3eqD,P4eqD, total_profit_DP/;
+MODEL SP_loc_dep_0 /eq1,eq2_loc_dep_0,eq3,eq3_1,eq4_loc_dep_0,eq4_1,alphaEqS,P1eqS,P2eqS,P3eqS,P4eqS, total_profit_SP/;
+MODEL DP_loc_dep_0 /eq1,eq2_loc_dep_0,eq3,eq3_1,eq4_loc_dep_0,eq4_1,alphaEqD,P1eqD,P2eqD,P3eqD,P4eqD, total_profit_DP/;
 
 option 
    NLP = knitro,
@@ -440,13 +445,21 @@ option
 
 
 If (Policy eq 0,
-        Solve SP_loc_dep using nlp maximizing obj;
+        If (loc_dep eq 1,
+            Solve SP_loc_dep_1 using nlp maximizing obj;
+        Elseif loc_dep eq 0,
+            Solve SP_loc_dep_0 using nlp maximizing obj;
+            );
 Elseif Policy eq 2,
-        Solve DP_loc_dep using nlp maximizing obj;
+        If (loc_dep eq 1, 
+            Solve DP_loc_dep_1 using nlp maximizing obj;
+        Elseif loc_dep eq 0,
+            Solve DP_loc_dep_0 using nlp maximizing obj;
+            );
     );
 
 *option MINLP = SBB;
-*Display x.l;  
+Display loc_dep;  
     
     '''
 
@@ -526,94 +539,506 @@ Elseif Policy eq 2,
         return t1.out_db["x"], 0
 
 
-class SingleProblem(object):
+class JointNLPOptimizer(object):
+    ws = None
+
+    def __init__(self, keepfiles=False):
+        JointNLPOptimizer.tmpdir = tempfile.mkdtemp()
+        JointNLPOptimizer.ws = GamsWorkspace(debug=True if keepfiles else False,
+                                             working_directory=JointNLPOptimizer.tmpdir)
+
+    def del_tmpdir(self):
+        shutil.rmtree(JointNLPOptimizer.tmpdir)
 
     @staticmethod
-    def SP_var(x, u, data):
-        alpha = np.einsum('dcln,dkcl->kln', np.einsum('cln,d->dcln', data.l, data.r), x)
-        P1 = np.array([1 - poisson.cdf(data.C, alpha[:, :, nj]) for nj in range(data.lprob)])
-        P2 = np.array([1 - poisson.cdf(data.C + np.sign(data.C), alpha[:, :, nj]) for nj in range(data.lprob)])
-        P3 = np.array([poisson.cdf(data.C - np.sign(data.C), alpha[:, :, nj]) for nj in range(data.lprob)])
-        P4 = np.array([poisson.cdf(data.C - 2 * np.sign(data.C), alpha[:, :, nj]) for nj in range(data.lprob)])
-        return alpha, P1, P2, P3, P4
+    def get_model_text():
+        return '''
+
+$title Sample.gms
+$offlisting
+$offsymxref
+
+Set      dj     
+         kj
+         tj
+         cj     
+         lj     
+         nj     
+         i     /0*100/
+;
+alias    (i,fi), (i,c0), (dj,di), (dj,dx), (lj,li);
+
+
+Scalar
+         dd
+         theta    
+         CAP
+         Policy
+         ep1  /0.000001/
+;
+
+Parameter
+         v(dj,kj,tj,cj,lj)
+         r(dj)
+         s(dj)
+         rt(dj,dj)
+         st(dj,dj) 
+         C(kj,lj)
+         gm(kj,lj)
+         bt(kj,lj)
+         csign(kj,lj)
+         L(cj,lj,nj)
+         prob(nj)
+         y(kj,cj,lj,tj,dj,dj)
+         z(dj,kj,tj,cj,lj)
+         loc_dep
+         parami(i)
+;
+
+$if not set gdxincname $abort 'no include file name for data file provided'
+$gdxin %gdxincname%
+$load dj,kj,tj,cj,lj,nj,dd,theta,CAP,v,r,s,C,gm,bt,csign,L,prob, Policy,y,z, loc_dep
+$gdxin
+
+rt(dj,di)$(ord(di) le ord(dj)) = max(0.6,1 - 0.04*(ord(dj) - ord(di)));
+st(dj,di)$(ord(di) le ord(dj)) = rt(dj,di);
+parami(i) = ord(i) - 1;
+
+Variables
+x(dj,kj,tj,cj,lj)  scheduling probability
+u(cj,lj)        leaving probability
+obj               total profit
+alphaS(kj,lj,nj)    
+P1S(kj,lj,nj)
+P2S(kj,lj,nj)
+P3S(kj,lj,nj)
+P4S(kj,lj,nj)
+alphaD(dj,kj,lj,nj)    
+P1D(dj,kj,lj,nj)
+P2D(dj,kj,lj,nj)
+P3D(dj,kj,lj,nj)
+P4D(dj,kj,lj,nj)
+Cvar(kj,lj)
+;
+
+
+Positive Variable x,u, P1S, P2S, P3S, P4S, alphaS, alphaD, P1D, P2D, P3D, P4D, Cvar;
+x.up(dj,kj,tj,cj,lj) = sign(v(dj,kj,tj,cj,lj));
+u.up(cj,lj) = 1;
+P1S.up(kj,lj,nj) = 1;
+P2S.up(kj,lj,nj) = 1;
+P3S.up(kj,lj,nj) = 1;
+P4S.up(kj,lj,nj) = 1;
+
+
+
+Equations
+total_profit_SP        Objective value SP
+total_profit_DP        Objective value SP
+eq1(kj,cj,lj)             Sum of probability 1 for dedicated class
+eq2_loc_dep_1(cj)             Sum of probability 1 for flexible class when loc_dep = 1
+eq2_loc_dep_0(cj,lj)             Sum of probability 1 for flexible class when loc_dep = 0
+eq3(dj,tj,cj,lj)       Sum of probability 1 for urgent class
+eq3_1(tj,cj,lj)        Sum of probability 1 for urgent class
+eq4(dj,kj,tj,cj,lj) choice constraint for flexible class
+eq4_loc_dep_0(dj,kj,tj,cj,lj) choice constraint for flexible class
+eq4_1(dj,kj,tj,cj,lj)
+alphaEqS(kj,lj,nj)
+P1eqS(kj,lj,nj)
+P2eqS(kj,lj,nj)
+P3eqS(kj,lj,nj)
+P4eqS(kj,lj,nj)
+alphaEqD(dj,kj,lj,nj)
+P1eqD(dj,kj,lj,nj)
+P2eqD(dj,kj,lj,nj)
+P3eqD(dj,kj,lj,nj)
+P4eqD(dj,kj,lj,nj)
+;
+
+total_profit_SP         .. obj =e= sum((kj,lj,nj), prob(nj)*alphaS(kj,lj,nj)*(1-bt(kj,lj)*(1-gm(kj,lj)))) - 
+                                   theta*sum((kj,lj,nj),prob(nj)*(alphaS(kj,lj,nj)*P1S(kj,lj,nj) - gm(kj,lj)*Cvar(kj,lj)*P2S(kj,lj,nj) + gm(kj,lj)*Cvar(kj,lj)*P3S(kj,lj,nj) - alphaS(kj,lj,nj)*P4S(kj,lj,nj)));
+total_profit_DP         .. obj =e= sum((dj,kj,lj,nj), alphaD(dj,kj,lj,nj)*prob(nj))-
+                                   theta*sum((dj,kj,lj,nj),prob(nj)*(alphaD(dj,kj,lj,nj))*P1D(dj,kj,lj,nj) - gm(kj,lj)*Cvar(kj,lj)*P2D(dj,kj,lj,nj) + gm(kj,lj)*Cvar(kj,lj)*P3D(dj,kj,lj,nj) - alphaD(dj,kj,lj,nj)*P4D(dj,kj,lj,nj));
+eq1(kj,cj,lj)$(ord(cj) >= 3 and ord(kj) eq ord(cj)-2)   .. u(cj,lj) + sum((dj,tj), x(dj,kj,tj,cj,lj)) =e= 1;
+eq2_loc_dep_1(cj)$(ord(cj) eq 2)      .. sum(lj, u(cj,lj) + sum((kj,dj,tj),x(dj,kj,tj,cj,lj))) =e= 1;
+eq2_loc_dep_0(cj,lj)$(ord(cj) eq 2)      .. u(cj,lj) + sum((kj,dj,tj),x(dj,kj,tj,cj,lj)) =e= 1;
+eq3(dj,tj,cj,lj)$(ord(cj) eq 1 and ord(dj) eq 1)   .. sum(kj, x(dj,kj,tj,cj,lj)) =e= 1;
+eq3_1(tj,cj,lj)$(ord(cj) eq 1) .. sum((kj,dj)$(ord(dj) >1), x(dj,kj,tj,cj,lj)) + u(cj,lj) =e= 0;
+eq4(dj,kj,tj,cj,lj)$(ord(cj) eq 2)  .. x(dj,kj,tj,cj,lj)-v(dj,kj,tj,cj,lj)*sum(li$(ord(lj) eq ord(li)),u(cj,lj)) =l= 0;
+eq4_loc_dep_0(dj,kj,tj,cj,lj)$(ord(cj) eq 2)  .. x(dj,kj,tj,cj,lj)-v(dj,kj,tj,cj,lj)*u(cj,lj) =l= 0;
+eq4_1(dj,kj,tj,cj,lj)$(ord(cj) > 2 and ord(kj) eq ord(cj) -2)  .. x(dj,kj,tj,cj,lj)-v(dj,kj,tj,cj,lj)*u(cj,lj) =l= 0;
+*********** Static
+alphaEqS(kj,lj,nj)   .. alphaS(kj,lj,nj) =e= sum((dj,cj,tj), L(cj,lj,nj)*r(dj)*x(dj,kj,tj,cj,lj));
+P1eqS(kj,lj,nj)      .. P1S(kj,lj,nj) =e= 1 - gammaReg(floor(Cvar(kj,lj)+1), alphaS(kj,lj,nj) + ep1);
+P2eqS(kj,lj,nj)      .. P2S(kj,lj,nj) =e= 1 - gammaReg(floor(Cvar(kj,lj)+2), alphaS(kj,lj,nj) + ep1);
+P3eqS(kj,lj,nj)      .. P3S(kj,lj,nj) =e= gammaReg(ceil(C(kj,lj)+1), alphaS(kj,lj,nj) + ep1);
+P4eqS(kj,lj,nj)      .. P4S(kj,lj,nj) =e= gammaReg(ceil(C(kj,lj)), alphaS(kj,lj,nj) + ep1);
+*********** Dynamic
+alphaEqD(dj,kj,lj,nj)   .. alphaD(dj,kj,lj,nj) =e= 0.0000001+sum((cj,di,dx)$((ord(dx) eq ord(di)+ord(dj)-1) and (ord(di) ge 1) and (ord(di) le dd +1 - ord(dj))),sum(tj,y(kj,cj,lj,tj,di,dx))*rt(dx,di)) + 
+sum(cj,L(cj,lj,nj)*r(dj)*sum(tj,x(dj,kj,tj,cj,lj))) + sum((cj,di)$((ord(di) ge 1) and (ord(di) le ord(dj)-1)),L(cj,lj,nj)*r(di)*sum(tj,z(di,kj,tj,cj,lj)));
+P1eqD(dj,kj,lj,nj)      .. P1D(dj,kj,lj,nj) =e= 1 - gammaReg(floor(Cvar(kj,lj)+1), alphaD(dj,kj,lj,nj) + ep1);
+P2eqD(dj,kj,lj,nj)      .. P2D(dj,kj,lj,nj) =e= 1 - gammaReg(floor(Cvar(kj,lj)+2), alphaD(dj,kj,lj,nj) + ep1);
+P3eqD(dj,kj,lj,nj)      .. P3D(dj,kj,lj,nj) =e= gammaReg(ceil(Cvar(kj,lj)), alphaD(dj,kj,lj,nj) + ep1);
+P4eqD(dj,kj,lj,nj)      .. P4D(dj,kj,lj,nj) =e= gammaReg(ceil(Cvar(kj,lj))-1, alphaD(dj,kj,lj,nj) + ep1);
+
+
+MODEL SP_loc_dep_1 /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqS,P1eqS,P2eqS,P3eqS,P4eqS, total_profit_SP/;
+MODEL DP_loc_dep_1 /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqD,P1eqD,P2eqD,P3eqD,P4eqD, total_profit_DP/;
+MODEL SP_loc_dep_0 /eq1,eq2_loc_dep_0,eq3,eq3_1,eq4_loc_dep_0,eq4_1,alphaEqS,P1eqS,P2eqS,P3eqS,P4eqS, total_profit_SP/;
+MODEL DP_loc_dep_0 /eq1,eq2_loc_dep_0,eq3,eq3_1,eq4_loc_dep_0,eq4_1,alphaEqD,P1eqD,P2eqD,P3eqD,P4eqD, total_profit_DP/;
+
+option 
+   NLP = conopt,
+    limcol = 0,
+    solprint = off,
+    sysout = off,
+    limrow = 0;
+
+
+If (Policy eq 0,
+        If (loc_dep eq 1,
+            Solve SP_loc_dep_1 using dnlp maximizing obj;
+        Elseif loc_dep eq 0,
+            Solve SP_loc_dep_0 using dnlp maximizing obj;
+            );
+Elseif Policy eq 2,
+        If (loc_dep eq 1, 
+            Solve DP_loc_dep_1 using dnlp maximizing obj;
+        Elseif loc_dep eq 0,
+            Solve DP_loc_dep_0 using dnlp maximizing obj;
+            );
+    );
+
+*option MINLP = SBB;
+Display loc_dep;  
+
+    '''
+
+    def solve(self, data, dynamic, schedule, loc_dep_inp):
+        db = JointNLPOptimizer.ws.add_database()
+
+        # Sets
+        dj = db.add_set("dj", 1, "DAYS")
+        [dj.add_record(str(p)) for p in range(1, data.dd + 1)]
+        kj = db.add_set("kj", 1, "Physicians")
+        [kj.add_record(str(p)) for p in range(1, data.dk + 1)]
+        tj = db.add_set("tj", 1, "Physicians")
+        [tj.add_record(str(p)) for p in range(1, data.dt + 1)]
+        cj = db.add_set("cj", 1, "Class")
+        [cj.add_record(str(p)) for p in range(1, data.dc + 1)]
+        lj = db.add_set("lj", 1, "Location")
+        [lj.add_record(str(p)) for p in range(1, data.dl + 1)]
+        nj = db.add_set("nj", 1, "setProb")
+        [nj.add_record(str(p)) for p in range(1, data.lprob + 1)]
+        # Parameters
+        dd = db.add_parameter('dd', 0, "Max Days")
+        dd.add_record().value = data.dd
+        theta = db.add_parameter("theta", 0, "Overtime Unit Cost")
+        theta.add_record().value = data.theta
+        cap = db.add_parameter('CAP', 0, "Max Capacity")
+        cap.add_record().value = data.CAP
+        policy = db.add_parameter('Policy', 0, "Policy Type")
+        loc_dep = db.add_parameter('loc_dep', 0, "Location Dependence")
+
+        policy.add_record().value = 0 if dynamic == "SP" else 1 if dynamic == "SPP" else 2 if (
+                dynamic in ["DP", "DCPP"]) else 3 if (dynamic == "DPP") else 4
+        loc_dep.add_record().value = loc_dep_inp
+        v = db.add_parameter_dc("v", [dj, kj, tj, cj, lj], "Choice")
+        r = db.add_parameter_dc('r', [dj], "retaining prob")
+        s = db.add_parameter_dc('s', [dj], "show up prob")
+        L = db.add_parameter_dc('L', [cj, lj, nj], "arrival rate")
+        C = db.add_parameter_dc('C', [kj, lj], "Capacity Constraint Parameter")
+        gm = db.add_parameter_dc('gm', [kj, lj], "1 - physician cancellation prob")
+        bt = db.add_parameter_dc('bt', [kj, lj], "1 - ")
+        csign = db.add_parameter_dc('csign', [kj, lj], "Capacity Constraint Parameter")
+        prob = db.add_parameter_dc('prob', [nj], "doubly stochastic prob")
+        y = db.add_parameter_dc('y', [kj, cj, lj, tj, dj, dj], 'Current Schedule')
+        z = db.add_parameter_dc('z', [dj, kj, tj, cj, lj], 'Static Prob')
+
+        for key, val in zip(range(1, data.dd + 1), data.r):
+            r.add_record(str(key)).value = val
+            s.add_record(str(key)).value = val
+        for key, val in np.ndenumerate(data.v):
+            v.add_record([str(i + 1) for i in key]).value = val
+        for key, val in np.ndenumerate(data.l):
+            L.add_record([str(i + 1) for i in key]).value = val
+        for key, val in np.ndenumerate(data.C):
+            C.add_record([str(i + 1) for i in key]).value = val
+        for key, val in np.ndenumerate(data.gamma):
+            gm.add_record([str(i + 1) for i in key]).value = val
+        for key, val in np.ndenumerate(data.beta):
+            bt.add_record([str(i + 1) for i in key]).value = val
+        for key, val in np.ndenumerate(data.csign):
+            csign.add_record([str(i + 1) for i in key]).value = val
+        for key, val in np.ndenumerate(data.probl):
+            prob.add_record([str(i + 1) for i in key]).value = val
+        for key, val in np.ndenumerate(schedule):
+            y.add_record([str(i + 1) for i in key]).value = val
+        for key, val in np.ndenumerate(data.Prob):
+            z.add_record([str(i + 1) for i in key]).value = val
+
+        t1 = JointNLPOptimizer.ws.add_job_from_string(JointNLPOptimizer.get_model_text())
+        opt = JointNLPOptimizer.ws.add_options()
+
+        opt.defines["gdxincname"] = db.name
+        # opt.all_model_types = "SBB" if data.joint == 1 else "CONOPT"
+        policy.first_record()
+        t1.run(opt, databases=db)
+
+        # print(
+        # "x(" + rec.key(0) + "," + rec.key(1) + + rec.key(2)+ rec.key(3) +"): level=" + str(rec.level) + " marginal=" + str(rec.marginal))
+        return t1.out_db["x"], t1.out_db["C"]
+
+
+class SingleOptimizer_loc(object):
+    ws = None
+
+    def __init__(self, keepfiles=False):
+        SingleOptimizer_loc.tmpdir = tempfile.mkdtemp()
+        SingleOptimizer_loc.ws = GamsWorkspace(debug=True if keepfiles else False,
+                                               working_directory=SingleOptimizer_loc.tmpdir)
+
+    def del_tmpdir(self):
+        shutil.rmtree(SingleOptimizer_loc.tmpdir)
 
     @staticmethod
-    def DP_obj(x, u, data):
-        return 0
+    def get_model_text():
+        return '''
 
-    @staticmethod
-    def SP_obj(x, u, data):
-        alpha, P1, P2, P3, P4 = SingleProblem.SP_var(x, u, data)
-        obj = -np.einsum('kln,n->', alpha, data.probl) + data.theta * np.einsum('kln,n->', (
-                np.einsum('kln,nkl->kln', alpha, P1) - np.einsum('kl,nkl->kln', data.C, P2) + np.einsum('kl,nkl->kln',
-                                                                                                        data.C,
-                                                                                                        P3) - np.einsum(
-            'kln,nkl->kln', alpha, P4)), data.probl)
-        return obj
+$title Sample.gms
+$offlisting
+$offsymxref
 
-    @staticmethod
-    def SP_jacobian(x, u, data):
-        alpha, P1, _, P3, _ = SingleProblem.SP_var(x, u, data)
-        return np.append((-np.einsum('dcl,kl->dkcl',
-                                     np.einsum('dcln,n->dcl', np.einsum('cln,d->dcln', data.l, data.r), data.probl),
-                                     np.sign(data.C)) +
-                          data.theta * np.einsum('dkcln,n->dkcl', np.einsum('nkl,dcln->dkcln', P1 - P3,
-                                                                            np.einsum('cln,d->dcln', data.l, data.r)),
-                                                 data.probl)).flatten(),
-                         np.zeros(data.dc * data.dl))
+Set      dj     
+         kj
+         tj
+         cj     
+         lj     
+         nj     
+         i     /0*100/
+;
+alias    (i,fi), (i,c0), (dj,di), (dj,dx), (lj,li);
 
-    # @staticmethod
-    # def SP_hessian(x,u,data):
-    #     alpha = np.einsum('dcln,dkcl->kln', np.einsum('cln,d->dcln', data.l, data.r), x)
-    #     return (2*data.theta * np.einsum('dkcln,n->dkcl',np.einsum('nkl,dcln->dkcln',np.array([poisson.pmf(data.C - np.sign(data.C),alpha[:,:,nj]) for nj in range(data.lprob)]),np.square(np.einsum('cln,d->dcln',data.l,data.r))),data.probl)).flatten()
 
-    @staticmethod
-    def constraint_eq(x, u, data):
-        cons = list()
-        for cj in range(data.dc):
-            if cj == 0:
-                cons = cons + [np.dot(data.csign[:, lj], x[0, :, cj, lj]) - 1 for lj in range(data.dl)] + [
-                    x[:, :, cj, lj].sum() - 1 for lj in range(data.dl)] + [u[cj, :].sum()]
-            elif cj == 1:
-                cons = cons + [u[cj, :].sum() + np.einsum('kl,dkl->', data.csign, x[:, :, cj, :]) - 1] + [
-                    u[cj, :].sum() + x[:, :, cj, :].sum() - 1]
-            else:
-                cons = cons + [u[cj, :].sum() + x[:, cj - 2, cj, :].sum() - 1]
-        return cons
+Scalar
+         dd
+         theta    
+         CAP
+         Policy
+;
 
-    @staticmethod
-    def constraint_ineq(x, u, data):
-        cons = list()
-        for cj in range(data.dc):
-            if cj >= 1:
-                cons = cons + [-x[dj, kj, cj, lj] + data.v[dj, kj, cj, lj] * u[cj, lj] for dj in range(data.dd) for kj
-                               in range(data.dk) for lj in range(data.dl)]
-        return cons
 
-    @staticmethod
-    def solve(data):
-        x0 = np.ones(data.dd * data.dk * data.dl * data.dc + data.dc * data.dl)
-        cons = ({'type': 'ineq', 'fun': lambda x: SingleProblem.constraint_ineq(
-            x[:data.dd * data.dk * data.dc * data.dl].reshape([data.dd, data.dk, data.dc, data.dl]),
-            x[data.dd * data.dk * data.dc * data.dl:].reshape([data.dc, data.dl]), data)},
-                {'type': 'eq', 'fun': lambda x: SingleProblem.constraint_eq(
-                    x[:data.dd * data.dk * data.dc * data.dl].reshape([data.dd, data.dk, data.dc, data.dl]),
-                    x[data.dd * data.dk * data.dc * data.dl:].reshape([data.dc, data.dl]), data)})
+Parameter
+         v(dj,kj,tj,cj,lj)
+         r(dj)
+         s(dj)
+         rt(dj,dj)
+         st(dj,dj) 
+         C(kj,lj)
+         gm(kj,lj)
+         bt(kj,lj)
+         csign(kj,lj)
+         L(cj,lj,nj)
+         prob(nj)
+         y(kj,cj,lj,tj,dj,dj)
+         z(dj,kj,tj,cj,lj)
+         loc_dep
+         parami(i)
+;
 
-        bounds = ((0, 1),) * (data.dd * data.dk * data.dc * data.dl + data.dc * data.dl)
-        fun = lambda x: SingleProblem.SP_obj(
-            x[:data.dd * data.dk * data.dc * data.dl].reshape([data.dd, data.dk, data.dc, data.dl]),
-            x[data.dd * data.dk * data.dc * data.dl:].reshape([data.dc, data.dl]), data)
+$if not set gdxincname $abort 'no include file name for data file provided'
+$gdxin %gdxincname%
+$load dj,kj,tj,cj,lj,nj,dd,theta,CAP,v,r,s,C,gm,bt,csign,L,prob, Policy,y,z, loc_dep
+$gdxin
 
-        jac = lambda x: SingleProblem.SP_jacobian(
-            x[:data.dd * data.dk * data.dc * data.dl].reshape([data.dd, data.dk, data.dc, data.dl]),
-            x[data.dd * data.dk * data.dc * data.dl:].reshape([data.dc, data.dl]), data)
-        hes = lambda x: SingleProblem.SP_hessian(
-            x[:data.dd * data.dk * data.dc * data.dl].reshape([data.dd, data.dk, data.dc, data.dl]),
-            x[data.dd * data.dk * data.dc * data.dl:].reshape([data.dc, data.dl]), data)
-        res = opt.minimize(fun, np.ones(data.dd * data.dk * data.dl * data.dc + data.dc * data.dl), jac=jac,
-                           bounds=bounds, constraints=cons, tol=0.0001, options={'disp': False})
-        return (res.x[:data.dd * data.dk * data.dc * data.dl].reshape([data.dd, data.dk, data.dc, data.dl]))
+rt(dj,di)$(ord(di) le ord(dj)) = max(0.6,1 - 0.04*(ord(dj) - ord(di)));
+st(dj,di)$(ord(di) le ord(dj)) = rt(dj,di);
+parami(i) = ord(i) - 1;
+
+Variables
+x(dj,kj,tj,cj,lj)  scheduling probability
+u(cj,lj)        leaving probability
+obj               total profit
+alphaS(kj,lj,nj)    
+P1S(kj,lj,nj)
+P2S(kj,lj,nj)
+P3S(kj,lj,nj)
+P4S(kj,lj,nj)
+alphaD(dj,kj,lj,nj)    
+P1D(dj,kj,lj,nj)
+P2D(dj,kj,lj,nj)
+P3D(dj,kj,lj,nj)
+P4D(dj,kj,lj,nj)
+;
+
+
+Positive Variable x,u, P1S, P2S, P3S, P4S, alphaS, alphaD, P1D, P2D, P3D, P4D;
+x.up(dj,kj,tj,cj,lj) = sign(v(dj,kj,tj,cj,lj));
+u.up(cj,lj) = 1;
+P1S.up(kj,lj,nj) = 1;
+P2S.up(kj,lj,nj) = 1;
+P3S.up(kj,lj,nj) = 1;
+P4S.up(kj,lj,nj) = 1;
+
+
+
+
+Equations
+total_profit_SP        Objective value SP
+total_profit_DP        Objective value SP
+eq1(kj,cj,lj)             Sum of probability 1 for dedicated class
+eq2_loc_dep_1(cj)             Sum of probability 1 for flexible class when loc_dep = 1
+eq2_loc_dep_0(cj,lj)             Sum of probability 1 for flexible class when loc_dep = 0
+eq3(dj,tj,cj,lj)       Sum of probability 1 for urgent class
+eq3_1(tj,cj,lj)        Sum of probability 1 for urgent class
+eq4(dj,kj,tj,cj,lj) choice constraint for flexible class
+eq4_loc_dep_0(dj,kj,tj,cj,lj) choice constraint for flexible class
+eq4_1(dj,kj,tj,cj,lj)
+alphaEqS(kj,lj,nj)
+P1eqS(kj,lj,nj)
+P2eqS(kj,lj,nj)
+P3eqS(kj,lj,nj)
+P4eqS(kj,lj,nj)
+alphaEqD(dj,kj,lj,nj)
+P1eqD(dj,kj,lj,nj)
+P2eqD(dj,kj,lj,nj)
+P3eqD(dj,kj,lj,nj)
+P4eqD(dj,kj,lj,nj)
+;
+
+total_profit_SP         .. obj =e= sum((kj,lj,nj), prob(nj)*alphaS(kj,lj,nj)*(1-bt(kj,lj)*(1-gm(kj,lj)))) - 
+                                   theta*sum((kj,lj,nj),prob(nj)*(alphaS(kj,lj,nj)*P1S(kj,lj,nj) - gm(kj,lj)*C(kj,lj)*P2S(kj,lj,nj) + gm(kj,lj)*C(kj,lj)*P3S(kj,lj,nj) - alphaS(kj,lj,nj)*P4S(kj,lj,nj)));
+total_profit_DP         .. obj =e= sum((dj,kj,lj,nj), alphaD(dj,kj,lj,nj)*prob(nj))-
+                                   theta*sum((dj,kj,lj,nj),prob(nj)*(alphaD(dj,kj,lj,nj))*P1D(dj,kj,lj,nj) - gm(kj,lj)*C(kj,lj)*P2D(dj,kj,lj,nj) + gm(kj,lj)*C(kj,lj)*P3D(dj,kj,lj,nj) - alphaD(dj,kj,lj,nj)*P4D(dj,kj,lj,nj));
+eq1(kj,cj,lj)$(ord(cj) >= 3 and ord(kj) eq ord(cj)-2)   .. u(cj,lj) + sum((dj,tj), x(dj,kj,tj,cj,lj)) =e= 1;
+eq2_loc_dep_1(cj)$(ord(cj) eq 2)      .. sum(lj, u(cj,lj) + sum((kj,dj,tj),x(dj,kj,tj,cj,lj))) =e= 1;
+eq2_loc_dep_0(cj,lj)$(ord(cj) eq 2)      .. u(cj,lj) + sum((kj,dj,tj),x(dj,kj,tj,cj,lj)) =e= 1;
+eq3(dj,tj,cj,lj)$(ord(cj) eq 1 and ord(dj) eq 1)   .. sum(kj, x(dj,kj,tj,cj,lj)) =e= 1;
+eq3_1(tj,cj,lj)$(ord(cj) eq 1) .. sum((kj,dj)$(ord(dj) >1), x(dj,kj,tj,cj,lj)) + u(cj,lj) =e= 0;
+eq4(dj,kj,tj,cj,lj)$(ord(cj) eq 2)  .. x(dj,kj,tj,cj,lj)-v(dj,kj,tj,cj,lj)*sum(li$(ord(lj) eq ord(li)),u(cj,lj)) =l= 0;
+eq4_loc_dep_0(dj,kj,tj,cj,lj)$(ord(cj) eq 2)  .. x(dj,kj,tj,cj,lj)-v(dj,kj,tj,cj,lj)*u(cj,lj) =l= 0;
+eq4_1(dj,kj,tj,cj,lj)$(ord(cj) > 2 and ord(kj) eq ord(cj) -2)  .. x(dj,kj,tj,cj,lj)-v(dj,kj,tj,cj,lj)*u(cj,lj) =l= 0;
+*********** Static
+alphaEqS(kj,lj,nj)   .. alphaS(kj,lj,nj) =e= sum((dj,cj,tj), L(cj,lj,nj)*r(dj)*x(dj,kj,tj,cj,lj));
+P1eqS(kj,lj,nj)      .. P1S(kj,lj,nj) =e= 1 - exp(-alphaS(kj,lj,nj))*(sum(i$(ord(i)<=floor(C(kj,lj))), alphaS(kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
+P2eqS(kj,lj,nj)      .. P2S(kj,lj,nj) =e= 1 - exp(-alphaS(kj,lj,nj))*(sum(i$(ord(i)<=floor(C(kj,lj))+sign(C(kj,lj))), alphaS(kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
+P3eqS(kj,lj,nj)      .. P3S(kj,lj,nj) =e= exp(-alphaS(kj,lj,nj))*(sum(i$(ord(i)<=ceil(C(kj,lj))), alphaS(kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
+P4eqS(kj,lj,nj)      .. P4S(kj,lj,nj) =e= exp(-alphaS(kj,lj,nj))*(sum(i$(ord(i)<=ceil(C(kj,lj))-sign(C(kj,lj))), alphaS(kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
+*********** Dynamic
+alphaEqD(dj,kj,lj,nj)   .. alphaD(dj,kj,lj,nj) =e= 0.000001+sum((cj,di,dx)$((ord(dx) eq ord(di)+ord(dj)-1) and (ord(di) ge 1) and (ord(di) le dd +1 - ord(dj))),sum(tj,y(kj,cj,lj,tj,di,dx))*rt(dx,di)) + 
+sum(cj,L(cj,lj,nj)*r(dj)*sum(tj,x(dj,kj,tj,cj,lj))) + sum((cj,di)$((ord(di) ge 1) and (ord(di) le ord(dj)-1)),L(cj,lj,nj)*r(di)*sum(tj,z(di,kj,tj,cj,lj)));
+P1eqD(dj,kj,lj,nj)      .. P1D(dj,kj,lj,nj) =e= 1 - exp(-alphaD(dj,kj,lj,nj))*(sum(i$(ord(i)<=floor(C(kj,lj))), alphaD(dj,kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
+P2eqD(dj,kj,lj,nj)      .. P2D(dj,kj,lj,nj) =e= 1 - exp(-alphaD(dj,kj,lj,nj))*(sum(i$(ord(i)<=floor(C(kj,lj))+1), alphaD(dj,kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
+P3eqD(dj,kj,lj,nj)      .. P3D(dj,kj,lj,nj) =e= exp(-alphaD(dj,kj,lj,nj))*(sum(i$(ord(i)<=ceil(C(kj,lj))-1), alphaD(dj,kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
+P4eqD(dj,kj,lj,nj)      .. P4D(dj,kj,lj,nj) =e= exp(-alphaD(dj,kj,lj,nj))*(sum(i$(ord(i)<=ceil(C(kj,lj))-2), alphaD(dj,kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
+
+
+MODEL SP_loc_dep_1 /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqS,P1eqS,P2eqS,P3eqS,P4eqS, total_profit_SP/;
+MODEL DP_loc_dep_1 /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqD,P1eqD,P2eqD,P3eqD,P4eqD, total_profit_DP/;
+MODEL SP_loc_dep_0 /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqS,P1eqS,P2eqS,P3eqS,P4eqS, total_profit_SP/;
+MODEL DP_loc_dep_0 /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqD,P1eqD,P2eqD,P3eqD,P4eqD, total_profit_DP/;
+
+option 
+   NLP = knitro,
+    limcol = 0,
+    solprint = off,
+    sysout = off,
+    limrow = 0;
+
+
+If (Policy eq 0,
+        If (loc_dep eq 1,
+            Solve SP_loc_dep_1 using nlp maximizing obj;
+        Elseif loc_dep eq 0,
+            Solve SP_loc_dep_0 using nlp maximizing obj;
+            );
+Elseif Policy eq 2,
+        If (loc_dep eq 1, 
+            Solve DP_loc_dep_1 using nlp maximizing obj;
+        Elseif loc_dep eq 0,
+            Solve DP_loc_dep_0 using nlp maximizing obj;
+            );
+    );
+
+*option MINLP = SBB;
+*Display x.l;  
+
+    '''
+
+    def solve(self, data, dynamic, schedule, loc_dep_inp):
+        db = SingleOptimizer.ws.add_database()
+
+        # Sets
+        dj = db.add_set("dj", 1, "DAYS")
+        [dj.add_record(str(p)) for p in range(1, data.dd + 1)]
+        kj = db.add_set("kj", 1, "Physicians")
+        [kj.add_record(str(p)) for p in range(1, data.dk + 1)]
+        tj = db.add_set("tj", 1, "Physicians")
+        [tj.add_record(str(p)) for p in range(1, data.dt + 1)]
+        cj = db.add_set("cj", 1, "Class")
+        [cj.add_record(str(p)) for p in range(1, data.dc + 1)]
+        lj = db.add_set("lj", 1, "Location")
+        [lj.add_record(str(p)) for p in range(1, data.dl + 1)]
+        nj = db.add_set("nj", 1, "setProb")
+        [nj.add_record(str(p)) for p in range(1, data.lprob + 1)]
+        # Parameters
+        dd = db.add_parameter('dd', 0, "Max Days")
+        dd.add_record().value = data.dd
+        theta = db.add_parameter("theta", 0, "Overtime Unit Cost")
+        theta.add_record().value = data.theta
+        cap = db.add_parameter('CAP', 0, "Max Capacity")
+        cap.add_record().value = data.CAP
+        policy = db.add_parameter('Policy', 0, "Policy Type")
+        loc_dep = db.add_parameter('loc_dep', 0, "Location Dependence")
+
+        policy.add_record().value = 0 if dynamic == "SP" else 1 if dynamic == "SPP" else 2 if (
+                dynamic in ["DP", "DCPP"]) else 3 if (dynamic == "DPP") else 4
+        loc_dep.add_record().value = loc_dep_inp
+        v = db.add_parameter_dc("v", [dj, kj, tj, cj, lj], "Choice")
+        r = db.add_parameter_dc('r', [dj], "retaining prob")
+        s = db.add_parameter_dc('s', [dj], "show up prob")
+        L = db.add_parameter_dc('L', [cj, lj, nj], "arrival rate")
+        C = db.add_parameter_dc('C', [kj, lj], "Capacity Constraint Parameter")
+        gm = db.add_parameter_dc('gm', [kj, lj], "1 - physician cancellation prob")
+        bt = db.add_parameter_dc('bt', [kj, lj], "1 - ")
+        csign = db.add_parameter_dc('csign', [kj, lj], "Capacity Constraint Parameter")
+        prob = db.add_parameter_dc('prob', [nj], "doubly stochastic prob")
+        y = db.add_parameter_dc('y', [kj, cj, lj, tj, dj, dj], 'Current Schedule')
+        z = db.add_parameter_dc('z', [dj, kj, tj, cj, lj], 'Static Prob')
+
+        for key, val in zip(range(1, data.dd + 1), data.r):
+            r.add_record(str(key)).value = val
+            s.add_record(str(key)).value = val
+        for key, val in np.ndenumerate(data.v):
+            v.add_record([str(i + 1) for i in key]).value = val
+        for key, val in np.ndenumerate(data.l):
+            L.add_record([str(i + 1) for i in key]).value = val
+        for key, val in np.ndenumerate(data.C):
+            C.add_record([str(i + 1) for i in key]).value = val
+        for key, val in np.ndenumerate(data.gamma):
+            gm.add_record([str(i + 1) for i in key]).value = val
+        for key, val in np.ndenumerate(data.beta):
+            bt.add_record([str(i + 1) for i in key]).value = val
+        for key, val in np.ndenumerate(data.csign):
+            csign.add_record([str(i + 1) for i in key]).value = val
+        for key, val in np.ndenumerate(data.probl):
+            prob.add_record([str(i + 1) for i in key]).value = val
+        for key, val in np.ndenumerate(schedule):
+            y.add_record([str(i + 1) for i in key]).value = val
+        for key, val in np.ndenumerate(data.Prob):
+            z.add_record([str(i + 1) for i in key]).value = val
+
+        t1 = SingleOptimizer.ws.add_job_from_string(SingleOptimizer.get_model_text())
+        opt = SingleOptimizer.ws.add_options()
+
+        opt.defines["gdxincname"] = db.name
+        # opt.all_model_types = "SBB" if data.joint == 1 else "CONOPT"
+        policy.first_record()
+        t1.run(opt, databases=db)
+
+        # print(
+        # "x(" + rec.key(0) + "," + rec.key(1) + + rec.key(2)+ rec.key(3) +"): level=" + str(rec.level) + " marginal=" + str(rec.marginal))
+        return t1.out_db["x"], 0
 
 
 def div0(a, b):
@@ -630,7 +1055,8 @@ def fastroll(a):
 
 
 def generateDailyProb(data, dynamic=None, cumulative=None, schedule=None, i=None, loc_dep=1, keepfiles=True):
-    optim = JointOptimizer(keepfiles=keepfiles) if (data.joint == 1) & (dynamic == "DCPP" or dynamic == "DP" ) else SingleOptimizer(keepfiles=keepfiles)
+    optim = JointNLPOptimizer(keepfiles=keepfiles) if (data.joint == 1) & (
+                dynamic == "DCPP" or dynamic == "DP") else SingleOptimizer(keepfiles=keepfiles)
 
     y = None
     if dynamic in ["DP", "DCPP"]:
