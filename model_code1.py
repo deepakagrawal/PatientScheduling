@@ -323,6 +323,7 @@ Scalar
          theta    
          CAP
          Policy
+         ep1  /0.000001/
 ;
 
 
@@ -358,25 +359,13 @@ x(dj,kj,tj,cj,lj)  scheduling probability
 u(cj,lj)        leaving probability
 obj               total profit
 alphaS(kj,lj,nj)    
-P1S(kj,lj,nj)
-P2S(kj,lj,nj)
-P3S(kj,lj,nj)
-P4S(kj,lj,nj)
 alphaD(dj,kj,lj,nj)    
-P1D(dj,kj,lj,nj)
-P2D(dj,kj,lj,nj)
-P3D(dj,kj,lj,nj)
-P4D(dj,kj,lj,nj)
 ;
 
 
-Positive Variable x,u, P1S, P2S, P3S, P4S, alphaS, alphaD, P1D, P2D, P3D, P4D;
+Positive Variable x,u, alphaS, alphaD;
 x.up(dj,kj,tj,cj,lj) = sign(v(dj,kj,tj,cj,lj));
 u.up(cj,lj) = 1;
-P1S.up(kj,lj,nj) = 1;
-P2S.up(kj,lj,nj) = 1;
-P3S.up(kj,lj,nj) = 1;
-P4S.up(kj,lj,nj) = 1;
 
 
 
@@ -393,21 +382,20 @@ eq4(dj,kj,tj,cj,lj) choice constraint for flexible class
 eq4_loc_dep_0(dj,kj,tj,cj,lj) choice constraint for flexible class
 eq4_1(dj,kj,tj,cj,lj)
 alphaEqS(kj,lj,nj)
-P1eqS(kj,lj,nj)
-P2eqS(kj,lj,nj)
-P3eqS(kj,lj,nj)
-P4eqS(kj,lj,nj)
 alphaEqD(dj,kj,lj,nj)
-P1eqD(dj,kj,lj,nj)
-P2eqD(dj,kj,lj,nj)
-P3eqD(dj,kj,lj,nj)
-P4eqD(dj,kj,lj,nj)
 ;
 
 total_profit_SP         .. obj =e= sum((kj,lj,nj), prob(nj)*alphaS(kj,lj,nj)*(1-bt(kj,lj)*(1-gm(kj,lj)))) - 
-                                   theta*sum((kj,lj,nj),prob(nj)*(alphaS(kj,lj,nj)*P1S(kj,lj,nj) - gm(kj,lj)*C(kj,lj)*P2S(kj,lj,nj) + gm(kj,lj)*C(kj,lj)*P3S(kj,lj,nj) - alphaS(kj,lj,nj)*P4S(kj,lj,nj)));
+                                   theta*sum((kj,lj,nj),prob(nj)*(alphaS(kj,lj,nj)*(1 - gammaReg(floor(C(kj,lj)+sign(C(kj,lj))) +ep1, alphaS(kj,lj,nj) + ep1)) - 
+                                   gm(kj,lj)*C(kj,lj)*(1 - gammaReg(floor(C(kj,lj)+2*sign(C(kj,lj))) +ep1, alphaS(kj,lj,nj) + ep1)) + 
+                                   gm(kj,lj)*C(kj,lj)*(gammaReg(ceil(C(kj,lj)+sign(C(kj,lj))) +ep1, alphaS(kj,lj,nj) + ep1)) - 
+                                   alphaS(kj,lj,nj)*(gammaReg(ceil(C(kj,lj)) +ep1, alphaS(kj,lj,nj) + ep1))));
 total_profit_DP         .. obj =e= sum((dj,kj,lj,nj), alphaD(dj,kj,lj,nj)*prob(nj))-
-                                   theta*sum((dj,kj,lj,nj),prob(nj)*(alphaD(dj,kj,lj,nj))*P1D(dj,kj,lj,nj) - gm(kj,lj)*C(kj,lj)*P2D(dj,kj,lj,nj) + gm(kj,lj)*C(kj,lj)*P3D(dj,kj,lj,nj) - alphaD(dj,kj,lj,nj)*P4D(dj,kj,lj,nj));
+                                   theta*sum((dj,kj,lj,nj),prob(nj)*(alphaD(dj,kj,lj,nj))*(1 - gammaReg(floor(C(kj,lj)+sign(C(kj,lj)))+ep1, alphaD(dj,kj,lj,nj) + ep1)) - 
+                                   gm(kj,lj)*C(kj,lj)*(1 - gammaReg(floor(C(kj,lj)+2*sign(C(kj,lj)))+ep1, alphaD(dj,kj,lj,nj) + ep1)) + 
+                                   gm(kj,lj)*C(kj,lj)*(gammaReg(ceil(C(kj,lj)) +ep1, alphaD(dj,kj,lj,nj) + ep1)) - 
+                                   alphaD(dj,kj,lj,nj)*(gammaReg(ceil(C(kj,lj) - sign(C(kj,lj))) +ep1, alphaD(dj,kj,lj,nj) + ep1)));
+                                   
 eq1(kj,cj,lj)$(ord(cj) >= 3 and ord(kj) eq ord(cj)-2)   .. u(cj,lj) + sum((dj,tj), x(dj,kj,tj,cj,lj)) =e= 1;
 eq2_loc_dep_1(cj)$(ord(cj) eq 2)      .. sum(lj, u(cj,lj) + sum((kj,dj,tj),x(dj,kj,tj,cj,lj))) =e= 1;
 eq2_loc_dep_0(cj,lj)$(ord(cj) eq 2)      .. u(cj,lj) + sum((kj,dj,tj),x(dj,kj,tj,cj,lj)) =e= 1;
@@ -418,26 +406,18 @@ eq4_loc_dep_0(dj,kj,tj,cj,lj)$(ord(cj) eq 2)  .. x(dj,kj,tj,cj,lj)-v(dj,kj,tj,cj
 eq4_1(dj,kj,tj,cj,lj)$(ord(cj) > 2 and ord(kj) eq ord(cj) -2)  .. x(dj,kj,tj,cj,lj)-v(dj,kj,tj,cj,lj)*u(cj,lj) =l= 0;
 *********** Static
 alphaEqS(kj,lj,nj)   .. alphaS(kj,lj,nj) =e= sum((dj,cj,tj), L(cj,lj,nj)*r(dj)*x(dj,kj,tj,cj,lj));
-P1eqS(kj,lj,nj)      .. P1S(kj,lj,nj) =e= 1 - exp(-alphaS(kj,lj,nj))*(sum(i$(ord(i)<=floor(C(kj,lj))), alphaS(kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
-P2eqS(kj,lj,nj)      .. P2S(kj,lj,nj) =e= 1 - exp(-alphaS(kj,lj,nj))*(sum(i$(ord(i)<=floor(C(kj,lj))+sign(C(kj,lj))), alphaS(kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
-P3eqS(kj,lj,nj)      .. P3S(kj,lj,nj) =e= exp(-alphaS(kj,lj,nj))*(sum(i$(ord(i)<=ceil(C(kj,lj))), alphaS(kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
-P4eqS(kj,lj,nj)      .. P4S(kj,lj,nj) =e= exp(-alphaS(kj,lj,nj))*(sum(i$(ord(i)<=ceil(C(kj,lj))-sign(C(kj,lj))), alphaS(kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
 *********** Dynamic
-alphaEqD(dj,kj,lj,nj)   .. alphaD(dj,kj,lj,nj) =e= 0.000001+sum((cj,di,dx)$((ord(dx) eq ord(di)+ord(dj)-1) and (ord(di) ge 1) and (ord(di) le dd +1 - ord(dj))),sum(tj,y(kj,cj,lj,tj,di,dx))*rt(dx,di)) + 
+alphaEqD(dj,kj,lj,nj)   .. alphaD(dj,kj,lj,nj) =e= sum((cj,di,dx)$((ord(dx) eq ord(di)+ord(dj)-1) and (ord(di) ge 1) and (ord(di) le dd +1 - ord(dj))),sum(tj,y(kj,cj,lj,tj,di,dx))*rt(dx,di)) + 
 sum(cj,L(cj,lj,nj)*r(dj)*sum(tj,x(dj,kj,tj,cj,lj))) + sum((cj,di)$((ord(di) ge 1) and (ord(di) le ord(dj)-1)),L(cj,lj,nj)*r(di)*sum(tj,z(di,kj,tj,cj,lj)));
-P1eqD(dj,kj,lj,nj)      .. P1D(dj,kj,lj,nj) =e= 1 - exp(-alphaD(dj,kj,lj,nj))*(sum(i$(ord(i)<=floor(C(kj,lj))), alphaD(dj,kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
-P2eqD(dj,kj,lj,nj)      .. P2D(dj,kj,lj,nj) =e= 1 - exp(-alphaD(dj,kj,lj,nj))*(sum(i$(ord(i)<=floor(C(kj,lj))+1), alphaD(dj,kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
-P3eqD(dj,kj,lj,nj)      .. P3D(dj,kj,lj,nj) =e= exp(-alphaD(dj,kj,lj,nj))*(sum(i$(ord(i)<=ceil(C(kj,lj))-1), alphaD(dj,kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
-P4eqD(dj,kj,lj,nj)      .. P4D(dj,kj,lj,nj) =e= exp(-alphaD(dj,kj,lj,nj))*(sum(i$(ord(i)<=ceil(C(kj,lj))-2), alphaD(dj,kj,lj,nj)**(ord(i)-1)/gamma(ord(i)) ));
 
 
-MODEL SP_loc_dep_1 /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqS,P1eqS,P2eqS,P3eqS,P4eqS, total_profit_SP/;
-MODEL DP_loc_dep_1 /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqD,P1eqD,P2eqD,P3eqD,P4eqD, total_profit_DP/;
-MODEL SP_loc_dep_0 /eq1,eq2_loc_dep_0,eq3,eq3_1,eq4_loc_dep_0,eq4_1,alphaEqS,P1eqS,P2eqS,P3eqS,P4eqS, total_profit_SP/;
-MODEL DP_loc_dep_0 /eq1,eq2_loc_dep_0,eq3,eq3_1,eq4_loc_dep_0,eq4_1,alphaEqD,P1eqD,P2eqD,P3eqD,P4eqD, total_profit_DP/;
+MODEL SP_loc_dep_1 /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqS, total_profit_SP/;
+MODEL DP_loc_dep_1 /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqD, total_profit_DP/;
+MODEL SP_loc_dep_0 /eq1,eq2_loc_dep_0,eq3,eq3_1,eq4_loc_dep_0,eq4_1,alphaEqS, total_profit_SP/;
+MODEL DP_loc_dep_0 /eq1,eq2_loc_dep_0,eq3,eq3_1,eq4_loc_dep_0,eq4_1,alphaEqD, total_profit_DP/;
 
 option 
-   NLP = knitro,
+   NLP = conopt,
     limcol = 0,
     solprint = off,
     sysout = off,
@@ -458,7 +438,6 @@ Elseif Policy eq 2,
             );
     );
 
-*option MINLP = SBB;
 Display loc_dep;  
     
     '''
@@ -609,26 +588,16 @@ x(dj,kj,tj,cj,lj)  scheduling probability
 u(cj,lj)        leaving probability
 obj               total profit
 alphaS(kj,lj,nj)    
-P1S(kj,lj,nj)
-P2S(kj,lj,nj)
-P3S(kj,lj,nj)
-P4S(kj,lj,nj)
-alphaD(dj,kj,lj,nj)    
-P1D(dj,kj,lj,nj)
-P2D(dj,kj,lj,nj)
-P3D(dj,kj,lj,nj)
-P4D(dj,kj,lj,nj)
+alphaD(dj,kj,lj,nj)  
 Cvar(kj,lj)
 ;
 
 
-Positive Variable x,u, P1S, P2S, P3S, P4S, alphaS, alphaD, P1D, P2D, P3D, P4D, Cvar;
+Positive Variable x,u, alphaS, alphaD, Cvar;
 x.up(dj,kj,tj,cj,lj) = sign(v(dj,kj,tj,cj,lj));
 u.up(cj,lj) = 1;
-P1S.up(kj,lj,nj) = 1;
-P2S.up(kj,lj,nj) = 1;
-P3S.up(kj,lj,nj) = 1;
-P4S.up(kj,lj,nj) = 1;
+Cvar.lo(kj,lj) = sign(C(kj,lj));
+Cvar.up(kj,lj) = 30*sign(C(kj,lj));
 
 
 
@@ -644,21 +613,20 @@ eq4(dj,kj,tj,cj,lj) choice constraint for flexible class
 eq4_loc_dep_0(dj,kj,tj,cj,lj) choice constraint for flexible class
 eq4_1(dj,kj,tj,cj,lj)
 alphaEqS(kj,lj,nj)
-P1eqS(kj,lj,nj)
-P2eqS(kj,lj,nj)
-P3eqS(kj,lj,nj)
-P4eqS(kj,lj,nj)
 alphaEqD(dj,kj,lj,nj)
-P1eqD(dj,kj,lj,nj)
-P2eqD(dj,kj,lj,nj)
-P3eqD(dj,kj,lj,nj)
-P4eqD(dj,kj,lj,nj)
 ;
 
 total_profit_SP         .. obj =e= sum((kj,lj,nj), prob(nj)*alphaS(kj,lj,nj)*(1-bt(kj,lj)*(1-gm(kj,lj)))) - 
-                                   theta*sum((kj,lj,nj),prob(nj)*(alphaS(kj,lj,nj)*P1S(kj,lj,nj) - gm(kj,lj)*Cvar(kj,lj)*P2S(kj,lj,nj) + gm(kj,lj)*Cvar(kj,lj)*P3S(kj,lj,nj) - alphaS(kj,lj,nj)*P4S(kj,lj,nj)));
+                                   theta*sum((kj,lj,nj),prob(nj)*(alphaS(kj,lj,nj)*(1 - gammaReg((Cvar(kj,lj)+sign(C(kj,lj)))+ep1, alphaS(kj,lj,nj) + ep1)) - 
+                                   gm(kj,lj)*Cvar(kj,lj)*(1 - gammaReg((Cvar(kj,lj)+2*sign(C(kj,lj)))+ep1, alphaS(kj,lj,nj) + ep1)) + 
+                                   gm(kj,lj)*Cvar(kj,lj)*(gammaReg((Cvar(kj,lj)+sign(C(kj,lj)))+ep1, alphaS(kj,lj,nj) + ep1)) - 
+                                   alphaS(kj,lj,nj)*(gammaReg((Cvar(kj,lj)) + ep1, alphaS(kj,lj,nj) + ep1))));
 total_profit_DP         .. obj =e= sum((dj,kj,lj,nj), alphaD(dj,kj,lj,nj)*prob(nj))-
-                                   theta*sum((dj,kj,lj,nj),prob(nj)*(alphaD(dj,kj,lj,nj))*P1D(dj,kj,lj,nj) - gm(kj,lj)*Cvar(kj,lj)*P2D(dj,kj,lj,nj) + gm(kj,lj)*Cvar(kj,lj)*P3D(dj,kj,lj,nj) - alphaD(dj,kj,lj,nj)*P4D(dj,kj,lj,nj));
+                                   theta*sum((dj,kj,lj,nj),prob(nj)*(alphaD(dj,kj,lj,nj))*(1 - gammaReg((Cvar(kj,lj)+sign(C(kj,lj)))+ep1, alphaD(dj,kj,lj,nj) + ep1)) - 
+                                   gm(kj,lj)*Cvar(kj,lj)*(1 - gammaReg((Cvar(kj,lj)+2*sign(C(kj,lj)))+ep1, alphaD(dj,kj,lj,nj) + ep1)) + 
+                                   gm(kj,lj)*Cvar(kj,lj)*(gammaReg((Cvar(kj,lj)) + ep1, alphaD(dj,kj,lj,nj) + ep1)) - 
+                                   alphaD(dj,kj,lj,nj)*(gammaReg((Cvar(kj,lj)-sign(C(kj,lj)))+ep1, alphaD(dj,kj,lj,nj) + ep1)));
+                                   
 eq1(kj,cj,lj)$(ord(cj) >= 3 and ord(kj) eq ord(cj)-2)   .. u(cj,lj) + sum((dj,tj), x(dj,kj,tj,cj,lj)) =e= 1;
 eq2_loc_dep_1(cj)$(ord(cj) eq 2)      .. sum(lj, u(cj,lj) + sum((kj,dj,tj),x(dj,kj,tj,cj,lj))) =e= 1;
 eq2_loc_dep_0(cj,lj)$(ord(cj) eq 2)      .. u(cj,lj) + sum((kj,dj,tj),x(dj,kj,tj,cj,lj)) =e= 1;
@@ -669,23 +637,15 @@ eq4_loc_dep_0(dj,kj,tj,cj,lj)$(ord(cj) eq 2)  .. x(dj,kj,tj,cj,lj)-v(dj,kj,tj,cj
 eq4_1(dj,kj,tj,cj,lj)$(ord(cj) > 2 and ord(kj) eq ord(cj) -2)  .. x(dj,kj,tj,cj,lj)-v(dj,kj,tj,cj,lj)*u(cj,lj) =l= 0;
 *********** Static
 alphaEqS(kj,lj,nj)   .. alphaS(kj,lj,nj) =e= sum((dj,cj,tj), L(cj,lj,nj)*r(dj)*x(dj,kj,tj,cj,lj));
-P1eqS(kj,lj,nj)      .. P1S(kj,lj,nj) =e= 1 - gammaReg(floor(Cvar(kj,lj)+1), alphaS(kj,lj,nj) + ep1);
-P2eqS(kj,lj,nj)      .. P2S(kj,lj,nj) =e= 1 - gammaReg(floor(Cvar(kj,lj)+2), alphaS(kj,lj,nj) + ep1);
-P3eqS(kj,lj,nj)      .. P3S(kj,lj,nj) =e= gammaReg(ceil(C(kj,lj)+1), alphaS(kj,lj,nj) + ep1);
-P4eqS(kj,lj,nj)      .. P4S(kj,lj,nj) =e= gammaReg(ceil(C(kj,lj)), alphaS(kj,lj,nj) + ep1);
 *********** Dynamic
-alphaEqD(dj,kj,lj,nj)   .. alphaD(dj,kj,lj,nj) =e= 0.0000001+sum((cj,di,dx)$((ord(dx) eq ord(di)+ord(dj)-1) and (ord(di) ge 1) and (ord(di) le dd +1 - ord(dj))),sum(tj,y(kj,cj,lj,tj,di,dx))*rt(dx,di)) + 
+alphaEqD(dj,kj,lj,nj)   .. alphaD(dj,kj,lj,nj) =e= sum((cj,di,dx)$((ord(dx) eq ord(di)+ord(dj)-1) and (ord(di) ge 1) and (ord(di) le dd +1 - ord(dj))),sum(tj,y(kj,cj,lj,tj,di,dx))*rt(dx,di)) + 
 sum(cj,L(cj,lj,nj)*r(dj)*sum(tj,x(dj,kj,tj,cj,lj))) + sum((cj,di)$((ord(di) ge 1) and (ord(di) le ord(dj)-1)),L(cj,lj,nj)*r(di)*sum(tj,z(di,kj,tj,cj,lj)));
-P1eqD(dj,kj,lj,nj)      .. P1D(dj,kj,lj,nj) =e= 1 - gammaReg(floor(Cvar(kj,lj)+1), alphaD(dj,kj,lj,nj) + ep1);
-P2eqD(dj,kj,lj,nj)      .. P2D(dj,kj,lj,nj) =e= 1 - gammaReg(floor(Cvar(kj,lj)+2), alphaD(dj,kj,lj,nj) + ep1);
-P3eqD(dj,kj,lj,nj)      .. P3D(dj,kj,lj,nj) =e= gammaReg(ceil(Cvar(kj,lj)), alphaD(dj,kj,lj,nj) + ep1);
-P4eqD(dj,kj,lj,nj)      .. P4D(dj,kj,lj,nj) =e= gammaReg(ceil(Cvar(kj,lj))-1, alphaD(dj,kj,lj,nj) + ep1);
 
 
-MODEL SP_loc_dep_1 /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqS,P1eqS,P2eqS,P3eqS,P4eqS, total_profit_SP/;
-MODEL DP_loc_dep_1 /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqD,P1eqD,P2eqD,P3eqD,P4eqD, total_profit_DP/;
-MODEL SP_loc_dep_0 /eq1,eq2_loc_dep_0,eq3,eq3_1,eq4_loc_dep_0,eq4_1,alphaEqS,P1eqS,P2eqS,P3eqS,P4eqS, total_profit_SP/;
-MODEL DP_loc_dep_0 /eq1,eq2_loc_dep_0,eq3,eq3_1,eq4_loc_dep_0,eq4_1,alphaEqD,P1eqD,P2eqD,P3eqD,P4eqD, total_profit_DP/;
+MODEL SP_loc_dep_1 /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqS,total_profit_SP/;
+MODEL DP_loc_dep_1 /eq1,eq2_loc_dep_1,eq3,eq3_1,eq4,eq4_1,alphaEqD,total_profit_DP/;
+MODEL SP_loc_dep_0 /eq1,eq2_loc_dep_0,eq3,eq3_1,eq4_loc_dep_0,eq4_1,alphaEqS,total_profit_SP/;
+MODEL DP_loc_dep_0 /eq1,eq2_loc_dep_0,eq3,eq3_1,eq4_loc_dep_0,eq4_1,alphaEqD,total_profit_DP/;
 
 option 
    NLP = conopt,
@@ -787,7 +747,7 @@ Display loc_dep;
 
         # print(
         # "x(" + rec.key(0) + "," + rec.key(1) + + rec.key(2)+ rec.key(3) +"): level=" + str(rec.level) + " marginal=" + str(rec.marginal))
-        return t1.out_db["x"], t1.out_db["C"]
+        return t1.out_db["x"], t1.out_db["Cvar"]
 
 
 class SingleOptimizer_loc(object):

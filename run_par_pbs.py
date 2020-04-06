@@ -53,7 +53,8 @@ import itertools
 #                         print(job_string)
 
 # Loop over your jobs
-for joint, doubly, policy, hor, th, ch, gm in itertools.product([0, 1], [0], ["DP"], [7], [1.25], [0, 1], [1.]):
+for joint, doubly, policy, hor, th, ch, gm in itertools.product([0, 1], [0], ["DCPP"], [7, 15], [1.25, 1.5, 1.75],
+                                                                [0, 1], [1.]):
     # Open a pipe to the qsub command.
     proc = Popen(['qsub'], shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
 
@@ -63,8 +64,8 @@ for joint, doubly, policy, hor, th, ch, gm in itertools.product([0, 1], [0], ["D
     walltime = "24:00:00"
     processors = "nodes=1:ppn=20"
     tempsuffix = "joint" if joint == 1 else "doubly" if doubly == 1 else "simple" + "large"
-    folder_name = "rev_DJCP_results_gamma_beta_v10_100days"
-    command = "~/work/anaconda2/envs/py3/bin/python SimulationMain.py -i 0 20 -p 20 -s %d -t %f -c %d -l 1 -o %s -j %d -d %d -n 2 -T 40 -D 10 --gamma %f --beta 0. -f large_dem_cap_loc_data_1.csv -z %s" % (
+    folder_name = "rev_DJCP_results_large_dem_cap_loc_data_1"
+    command = "~/work/anaconda2/envs/py3/bin/python SimulationMain.py -i 0 40 -p 20 -s %d -t %f -c %d -l 1 -o %s -j %d -d %d -n 2 -T 40 -D 10 --gamma %f --beta 0. -f large_dem_cap_loc_data_1.csv -z %s" % (
     hor, th, ch, policy, joint, doubly, gm, folder_name)
     job_string = """
                 #!/bin/bash
