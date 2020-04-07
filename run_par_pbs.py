@@ -53,7 +53,7 @@ import itertools
 #                         print(job_string)
 
 # Loop over your jobs
-for joint, doubly, policy, hor, th, ch, gm in itertools.product([0, 1], [0], ["DCPP"], [7, 15], [1.25, 1.5, 1.75],
+for joint, doubly, policy, hor, th, ch, gm in itertools.product([0], [0], ["DCPP"], [15], [1.75],
                                                                 [0, 1], [1.]):
     # Open a pipe to the qsub command.
     proc = Popen(['qsub'], shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
@@ -61,10 +61,10 @@ for joint, doubly, policy, hor, th, ch, gm in itertools.product([0, 1], [0], ["D
     # Customize your options here
     job_name = "%02s%d%.2f%s%s%.2f" % (policy[:2], hor, th, ch, "D" if doubly == 1 else "J" if joint == 1 else "S", gm)
     print(job_name)
-    walltime = "24:00:00"
+    walltime = "2:00:00"
     processors = "nodes=1:ppn=20"
     tempsuffix = "joint" if joint == 1 else "doubly" if doubly == 1 else "simple" + "large"
-    folder_name = "rev_DJCP_results_large_dem_cap_loc_data_1"
+    folder_name = "rev_DJCP_results_large_dem_cap_loc_data_1_test"
     command = "~/work/anaconda2/envs/py3/bin/python SimulationMain.py -i 0 40 -p 20 -s %d -t %f -c %d -l 1 -o %s -j %d -d %d -n 2 -T 40 -D 10 --gamma %f --beta 0. -f large_dem_cap_loc_data_1.csv -z %s" % (
     hor, th, ch, policy, joint, doubly, gm, folder_name)
     job_string = """
@@ -72,7 +72,7 @@ for joint, doubly, policy, hor, th, ch, gm in itertools.product([0, 1], [0], ["D
                 #PBS -N %s
                 #PBS -l walltime=%s
                 #PBS -l %s
-                # PBS -l pmem=5gb
+                #PBS -l pmem=32gb
                 #PBS -A open
                 #PBS -m abe
                 #PBS -o %s.out

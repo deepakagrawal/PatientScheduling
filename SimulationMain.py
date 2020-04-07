@@ -226,11 +226,9 @@ def run_main(iter, loc_dep, data=None):
                     ptemp = patnext[c, loc]
                     patgoing[:, c - 2, :, c, loc], cancel[:, c - 2, :, c, loc], left[c, loc], pcancel[:, c - 2, :, c,
                                                                                               loc], patnext[
-                        c, loc] = allocateDedicated(
-                        pat[c, loc, i], P[:, c - 2, :, c, loc], patgoing[:, c - 2, :, c, loc],
-                        cancel[:, c - 2, :, c, loc],
-                        left[c, loc], data.r,
-                        pcancel[:, c - 2, :, c, loc], patnext[c, loc])
+                        c, loc] = allocateDedicated(pat[c, loc, i], P[:, c - 2, :, c, loc],
+                                                    patgoing[:, c - 2, :, c, loc], cancel[:, c - 2, :, c, loc],
+                                                    left[c, loc], data.r, pcancel[:, c - 2, :, c, loc], patnext[c, loc])
                     if (patgoing[:, c - 2, :, c, loc].sum() + left[c, loc] != pat[c, loc] + ptemp).all():
                         warnings.warn(
                             f"incoming patients are not equal to scheduled + left, {iter}, {patgoing[:, c - 2, :, c,
